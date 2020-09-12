@@ -1,0 +1,9 @@
+reiz.io
+~~~~~~~
+
+Copyright (c) 2020 Batuhan Taskaya
+
+Redistribution and use in source and binary forms, with or without
+modification, are not permitted unless there is an explicit permission
+of the copyright holder.
+
