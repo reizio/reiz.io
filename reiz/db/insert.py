@@ -12,6 +12,8 @@ from typing import Any, Dict, List, NamedTuple, Optional
 
 import edgedb
 
+from reiz.utilities import read_config
+
 sys.setrecursionlimit(1000000)
 DEF_DSN = "edgedb://edgedb@localhost/asttests"
 ENUMERATIONS = (
@@ -36,6 +38,7 @@ RESERVED_NAMES = frozenset(
         "id",
     )
 )
+MODULE_CACHE = frozenset()
 
 
 def protected_name(name, prefix=True):
@@ -125,6 +128,9 @@ def insert(node, connection, **extras):
 def inject_project(directory: Path, **db_opt):
     with closing(edgedb.connect(**db_opt)) as connection:
         for module in directory.glob("**/*.py"):
+            if str(module) in MODULE_CACHE:
+                print(f"{module} was cached so passing the insertion...")
+                continue
             try:
                 with connection.transaction():
                     with tokenize.open(module) as file:
@@ -132,35 +138,33 @@ def inject_project(directory: Path, **db_opt):
                     insert(tree, connection, filename=repr(str(module)))
                     print(f"{module} inserted...")
             except:
+                print(f"{module} couldn't inserted!!!")
                 traceback.print_exc()
 
     return directory.name
 
 
-def read_config(directory: Path, config: str) -> List[str]:
-    if (pkg_config := (directory / config).with_suffix(".json")).exists():
-        with open(pkg_config) as config:
-            cache = json.load(config)
-        return cache
-    else:
-        return []
-
-
-def write_config(directory: Path, config: str, data: Any):
-    with open((directory / config).with_suffix(".json"), "w") as config:
-        json.dump(data, config)
+def set_cache(**db_opts):
+    global MODULE_CACHE
+    with closing(edgedb.connect(**db_opts)) as connection:
+        MODULE_CACHE = frozenset(
+            module.filename
+            for module in connection.query(
+                f"SELECT {protected_name('Module')} {{ filename }}"
+            )
+        )
 
 
 def inject(data_dir, workers, **kwargs):
-    origin = read_config(data_dir, "db")
-    projects = set(read_config(data_dir, "info")).difference(origin)
+    set_cache(**kwargs)
+    projects = read_config(data_dir / "info.json")
+
     with ProcessPoolExecutor(max_workers=workers) as executor:
         bound_injector = partial(inject_project, **kwargs)
         for project in executor.map(
             bound_injector, map(data_dir.joinpath, projects)
         ):
             origin.append(project)
-    write_config(data_dir, "db", origin)
 
 
 def main():
