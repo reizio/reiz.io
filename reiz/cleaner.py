@@ -12,7 +12,7 @@ from functools import partial
 from pathlib import Path
 from typing import List
 
-from reiz.utilities import read_config, write_config
+from reiz.utilities import logger, read_config, write_config
 
 
 def source_code(path: Path):
@@ -60,6 +60,7 @@ def clean(dirty_dir: Path, clean_dir: Path, workers: int) -> None:
 
         project_paths[project_name] = directory
 
+    results = []
     with ProcessPoolExecutor(max_workers=workers) as executor:
         bound_extractor = partial(extract, clean_dir=clean_dir)
         for project_name, destination_dir in executor.map(
@@ -70,11 +71,21 @@ def clean(dirty_dir: Path, clean_dir: Path, workers: int) -> None:
             ),
         ):
             if destination_dir is None:
-                print(f"{project_name} extraction failed")
+                logger.debug("extraction failed for project %r", project_name)
             else:
-                print(f"{project_name} extracted to {destination_dir!s}")
-                cache.append(project_name)
-    print(f"Cleaned {len(cache)}/{len(projects)} projects!")
+                logger.debug(
+                    "project %r successfully extracted to %s",
+                    project_name,
+                    destination_dir,
+                )
+                results.append(project_name)
+    cache.extend(results)
+    logger.info(
+        "cleaned %d packages (all-time: %d/%d)",
+        len(results),
+        len(cache),
+        len(projects),
+    )
     write_config(clean_dir / "info.json", cache)
 
 

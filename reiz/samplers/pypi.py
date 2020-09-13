@@ -133,6 +133,7 @@ def download_top_packages(
             directory / "info.json",
             read_config(directory / "info.json") + caches,
         )
+    logging.info("fetched %d projects", len(caches))
 
 
 def main():
