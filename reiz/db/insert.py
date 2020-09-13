@@ -110,9 +110,9 @@ def convert(child, connection):
         raise ValueError(f"Unexpected type: {child}")
 
 
-def insert(node, connection):
+def insert(node, connection, **extras):
     name = protected_name(type(node).__name__)
-    fields = {}
+    fields = {**extras}
     for field, child in ast.iter_fields(node):
         if field == "value" and isinstance(node, ast.Constant):
             child = str(child)
@@ -124,17 +124,16 @@ def insert(node, connection):
 
 def inject_project(directory: Path, **db_opt):
     with closing(edgedb.connect(**db_opt)) as connection:
-        try:
-            for module in directory.glob("**/*.py"):
+        for module in directory.glob("**/*.py"):
+            try:
                 with connection.transaction():
                     with tokenize.open(module) as file:
                         tree = ast.parse(file.read())
-                    insert(tree, connection)
-        except:
-            traceback.print_exc()
-            return None
+                    insert(tree, connection, filename=repr(str(module)))
+                    print(f"{module} inserted...")
+            except:
+                traceback.print_exc()
 
-    print(f"Injection of {directory.name} completed!")
     return directory.name
 
 
