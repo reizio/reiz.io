@@ -5,11 +5,16 @@ START MIGRATION TO {
         type PyModule extending mod, AST {
             multi link body -> stmt;
             multi link type_ignores -> type_ignore;
-            required property filename -> str {
-                constraint exclusive;
+            required property filename -> str { 
+                constraint exclusive; 
             };
         }
-        abstract type stmt {}
+        abstract type stmt {
+            required property lineno -> int64;
+            required property col_offset -> int64;
+            property end_lineno -> int64;
+            property end_col_offset -> int64;
+        }
         type FunctionDef extending stmt, AST {
             required property name -> str;
             required link args -> arguments;
@@ -123,7 +128,12 @@ START MIGRATION TO {
         type Pass extending stmt, AST {}
         type Break extending stmt, AST {}
         type Continue extending stmt, AST {}
-        abstract type expr {}
+        abstract type expr {
+            required property lineno -> int64;
+            required property col_offset -> int64;
+            property end_lineno -> int64;
+            property end_col_offset -> int64;
+        }
         type BoolOp extending expr, AST {
             required property op -> boolop;
             multi link values -> expr;
@@ -232,7 +242,9 @@ START MIGRATION TO {
             required property ctx -> expr_context;
         }
         scalar type expr_context extending enum<'Load', 'Store', 'Del', 'AugLoad', 'AugStore', 'Param'> {}
-        abstract type slice {}
+        abstract type slice {
+            required property sentinel -> int64;
+        }
         type Slice extending slice, AST {
             link lower -> expr;
             link upper -> expr;
@@ -254,7 +266,12 @@ START MIGRATION TO {
             multi link ifs -> expr;
             required property is_async -> int64;
         }
-        abstract type excepthandler {}
+        abstract type excepthandler {
+            required property lineno -> int64;
+            required property col_offset -> int64;
+            property end_lineno -> int64;
+            property end_col_offset -> int64;
+        }
         type ExceptHandler extending excepthandler, AST {
             link type -> expr;
             property name -> str;
@@ -273,6 +290,10 @@ START MIGRATION TO {
             required property arg -> str;
             link annotation -> expr;
             property type_comment -> str;
+            required property lineno -> int64;
+            required property col_offset -> int64;
+            property end_lineno -> int64;
+            property end_col_offset -> int64;
         }
         type keyword {
             property arg -> str;
