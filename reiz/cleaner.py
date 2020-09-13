@@ -4,6 +4,7 @@ import ast
 import json
 import shutil
 import tokenize
+import traceback
 import warnings
 from argparse import ArgumentParser
 from concurrent.futures import ProcessPoolExecutor
