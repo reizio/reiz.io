@@ -129,16 +129,16 @@ def inject_project(directory: Path, **db_opt):
     with closing(edgedb.connect(**db_opt)) as connection:
         for module in directory.glob("**/*.py"):
             if str(module) in MODULE_CACHE:
-                print(f"{module} was cached so passing the insertion...")
+                print(f"FILE: {module} already inserted...")
                 continue
             try:
                 with connection.transaction():
                     with tokenize.open(module) as file:
                         tree = ast.parse(file.read())
                     insert(tree, connection, filename=repr(str(module)))
-                    print(f"{module} inserted...")
+                    print(f"FILE: {module} extraction completed...")
             except:
-                print(f"{module} couldn't inserted!!!")
+                print(f"FILE: {module} extraction failed!!!")
                 traceback.print_exc()
 
     return directory.name
@@ -164,7 +164,7 @@ def inject(data_dir, workers, **kwargs):
         for project in executor.map(
             bound_injector, map(data_dir.joinpath, projects)
         ):
-            origin.append(project)
+            print(f"PROJECT: {project!s} extraction completed")
 
 
 def main():

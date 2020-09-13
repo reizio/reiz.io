@@ -14,6 +14,8 @@ from typing import Generator, List, Literal, Optional, Tuple, Union, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen, urlretrieve
 
+from reiz.utilities import read_config, write_config
+
 PYPI_INSTANCE = "https://pypi.org/pypi"
 PYPI_TOP_PACKAGES = "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-{days}-days.json"
 
@@ -100,24 +102,10 @@ def get_top_packages(days: Days) -> List[str]:
     return [package["project"] for package in result["rows"]]
 
 
-def dump_config(directory: Path, values: List[str]):
-    with open(directory / "info.json", "w") as f:
-        json.dump(values, f)
-
-
-def read_config(directory: Path) -> List[str]:
-    if (pkg_config := directory / "info.json").exists():
-        with open(pkg_config) as f:
-            cache = json.load(f)
-        return cache
-    else:
-        return []
-
-
 def filter_already_downloaded(
     directory: Path, packages: List[str]
 ) -> List[str]:
-    cache = read_config(directory)
+    cache = read_config(directory / "info.json")
     return [package for package in packages if package not in cache]
 
 
@@ -146,7 +134,10 @@ def download_top_packages(
                         f"Package {package_directory} is created for {package}."
                     )
     finally:
-        dump_config(directory, read_config(directory) + caches)
+        write_config(
+            directory / "info.json",
+            read_config(directory / "info.json") + caches,
+        )
 
 
 def main():
