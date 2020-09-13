@@ -14,7 +14,7 @@ from typing import Generator, List, Literal, Optional, Tuple, Union, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen, urlretrieve
 
-from reiz.utilities import read_config, write_config
+from reiz.utilities import logger, read_config, write_config
 
 PYPI_INSTANCE = "https://pypi.org/pypi"
 PYPI_TOP_PACKAGES = "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-{days}-days.json"
@@ -74,13 +74,12 @@ def download_and_extract(
     except ValueError:
         return None
 
-    print(f"Downloading {package}.")
     local_file, _ = urlretrieve(source, directory / f"{package}-src")
     with get_archive_manager(local_file) as archive:
-        print(f"Extracting {package}")
         archive.extractall(path=directory)
         result_dir = get_first_archive_member(archive)
     os.remove(local_file)
+    logger.debug("fetched package: %r", package)
     return directory / result_dir
 
 
@@ -90,8 +89,7 @@ def get_package(
     try:
         return package, download_and_extract(package, directory, version)
     except Exception as e:
-        print(f"Caught an exception while downloading {package}.")
-        print(traceback.print_exc(e))
+        logger.exception("caught exception while fetching %r", package)
         return package, None
 
 
@@ -130,9 +128,6 @@ def download_top_packages(
             ):
                 if package_directory is not None:
                     caches.append(package)
-                    print(
-                        f"Package {package_directory} is created for {package}."
-                    )
     finally:
         write_config(
             directory / "info.json",

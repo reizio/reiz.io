@@ -1,6 +1,14 @@
 import json
+import logging
 from pathlib import Path
 from typing import List
+
+logger = logging.getLogger("source")
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(asctime)s] %(funcName)-15s --- %(message)s",
+    datefmt="%m-%d %H:%M",
+)
 
 
 def read_config(config: Path) -> List[str]:
