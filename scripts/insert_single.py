@@ -25,7 +25,7 @@ def insert_single(file, show_queries=False):
 
         connection.query_one = query_one_with_stats
         insert_file(connection, file)
-    print("Total {total_queries} performed!")
+    print(f"Total {total_queries} performed!")
 
 
 def main():

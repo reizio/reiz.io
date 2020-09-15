@@ -1,6 +1,7 @@
 import ast
 import tokenize
 from dataclasses import dataclass, field
+from typing import List, Optional
 
 from reiz.db.schema import ENUM_TYPES, protected_name
 from reiz.ql.edgeql import (
@@ -9,6 +10,7 @@ from reiz.ql.edgeql import (
     Prepared,
     QLObject,
     Select,
+    Update,
     cast,
     ref,
     with_parens,
@@ -48,6 +50,8 @@ class Sentinel(ast.expr):
 
 alter_ast(ast.Module, "_fields", "filename")
 alter_ast(ast.slice, "_attributes", "sentinel")
+for sum_type in (ast.slice, ast.expr, ast.stmt):
+    alter_ast(sum_type, "_attributes", "_module")
 
 
 @object.__new__
@@ -99,7 +103,7 @@ class QLAst(ast.NodeTransformer):
 @dataclass
 class QLState:
     from_parent: Optional[ast.AST] = None
-    selection_pool: List[Select] = field(defualt_factory=list)
+    selection_pool: List[Select] = field(default_factory=list)
 
 
 def convert(connection, ql_state, obj):
@@ -113,7 +117,7 @@ def convert(connection, ql_state, obj):
             enum_name = protected_name(enum_type.__name__, prefix=True)
             return cast(enum_name, obj_name)
         else:
-            obj_ref = ref(insert(connection, obj))
+            obj_ref = ref(insert(connection, ql_state, obj))
             base_type = QLAst.infer_base(obj).__name__
             selection = Select(
                 base_type,
@@ -123,7 +127,7 @@ def convert(connection, ql_state, obj):
             ql_state.selection_pool.append(selection)
             return with_parens(selection.construct())
     elif isinstance(obj, list):
-        items = (convert(connection, value, from_parent=obj) for value in obj)
+        items = (convert(connection, ql_state, value) for value in obj)
         return with_parens(", ".join(items), combo="{}")
     elif type(obj) is int:
         return obj
@@ -146,7 +150,7 @@ def insert(connection, ql_state, node):
     for field, value in (*ast.iter_fields(node), *iter_attributes(node)):
         if value is None:
             continue
-        insertions[field] = convert(connection, value)
+        insertions[field] = convert(connection, ql_state, value)
     query = Insert(node_type, insertions).construct()
     logger.trace("Running query: %r", query)
     return connection.query_one(query)
@@ -160,4 +164,19 @@ def insert_file(connection, file):
     tree.filename = file
     ql_state = QLState()
     with connection.transaction():
-        insert(connection, ql_state, tree)
+        module = insert(connection, ql_state, tree)
+        module_select = with_parens(
+            Select("Module", limit=1, filters={"id": ref(module)}).construct()
+        )
+
+        # FIX-ME(high): Optimize insertion of _module
+        # https://github.com/edgedb/edgedb/discussions/1777
+        for selection in ql_state.selection_pool:
+            if "_module" in getattr(ast, selection.name)._attributes:
+                update = Update(
+                    selection.name,
+                    filters=selection.filters,
+                    assigns={"_module": module_select},
+                ).construct()
+                logger.trace("Running query: %r", update)
+                connection.query_one(update)

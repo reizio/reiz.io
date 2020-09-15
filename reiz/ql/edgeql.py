@@ -81,3 +81,25 @@ class Select(QLStatementWithParameters):
         if self.limit is not None:
             query += f" LIMIT {self.limit}"
         return query
+
+
+@dataclass(frozen=True, unsafe_hash=True)
+class Update(QLStatement):
+    name: str
+    assigns: Dict[str, str] = field(default_factory=dict)
+    filters: Optional[Dict[str, str]] = field(default_factory=dict)
+
+    def construct(self):
+        query = "UPDATE"
+        query += " " + protected_name(self.name)
+        if self.filters:
+            query += " FILTER "
+            filter_opts = (
+                f".{key} = {value}" for key, value in self.filters.items()
+            )
+            query += " AND ".join(filter_opts)
+        query += " SET "
+        query += with_parens(
+            self.prepare_arguments(self.assigns, operator=":="), combo="{}"
+        )
+        return query
