@@ -7,6 +7,8 @@ from typing import List, Optional
 
 import pyasdl
 
+from reiz.db.schema import protected_name
+
 DEFAULT_INDENT = " " * 4
 EDGEQL_BASICS = {
     "int": "int64",
@@ -16,21 +18,6 @@ EDGEQL_BASICS = {
 }
 
 UNIQUE_FIELDS = ["filename"]
-RESERVED_NAMES = frozenset(
-    (
-        "Module",
-        "Delete",
-        "For",
-        "If",
-        "With",
-        "Raise",
-        "Import",
-        "module",
-        "Global",
-        "Set",
-        "id",
-    )
-)
 
 
 class FieldConstraint(Enum):
@@ -41,16 +28,6 @@ class FieldConstraint(Enum):
 class ModelConstraint(Enum):
     SCALAR = "scalar"
     ABSTRACT = "abstract"
-
-
-def protected_name(name):
-    if name in RESERVED_NAMES:
-        if name.istitle():
-            return "Py" + name
-        else:
-            return "py_" + name
-    else:
-        return name
 
 
 @dataclass
@@ -77,7 +54,7 @@ class QLField:
         else:
             properties.append("link")
 
-        properties.append(protected_name(self.name))
+        properties.append(protected_name(self.name, prefix=False))
         properties.append("->")
         properties.append(self.type)
         if self.is_unique:
@@ -92,7 +69,7 @@ class QLField:
         if self.qualifier in EDGEQL_BASICS:
             return EDGEQL_BASICS[self.qualifier]
         else:
-            return protected_name(self.qualifier)
+            return protected_name(self.qualifier, prefix=False)
 
 
 @dataclass
@@ -104,7 +81,7 @@ class QLModel:
 
     def __str__(self):
         lines = []
-        lines.append(f"type {protected_name(self.name)}")
+        lines.append(f"type {protected_name(self.name, prefix=False)}")
         if self.constraint is not None:
             lines[-1] = self.constraint.value + " " + lines[-1]
         if self.extending is not None:

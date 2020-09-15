@@ -14,6 +14,7 @@ START MIGRATION TO {
             required property col_offset -> int64;
             property end_lineno -> int64;
             property end_col_offset -> int64;
+            link _module -> mod;
         }
         type FunctionDef extending stmt, AST {
             required property name -> str;
@@ -133,6 +134,7 @@ START MIGRATION TO {
             required property col_offset -> int64;
             property end_lineno -> int64;
             property end_col_offset -> int64;
+            link _module -> mod;
         }
         type BoolOp extending expr, AST {
             required property op -> boolop;
@@ -241,9 +243,10 @@ START MIGRATION TO {
             multi link elts -> expr;
             required property ctx -> expr_context;
         }
-        scalar type expr_context extending enum<'Load', 'Store', 'Del', 'AugLoad', 'AugStore', 'Param'> {}
+        type Sentinel extending expr, AST {}
         abstract type slice {
-            required property sentinel -> int64;
+            required link sentinel -> expr;
+            link _module -> mod;
         }
         type Slice extending slice, AST {
             link lower -> expr;
@@ -256,10 +259,6 @@ START MIGRATION TO {
         type Index extending slice, AST {
             required link value -> expr;
         }
-        scalar type boolop extending enum<'And', 'Or'> {}
-        scalar type operator extending enum<'Add', 'Sub', 'Mult', 'MatMult', 'Div', 'Mod', 'Pow', 'LShift', 'RShift', 'BitOr', 'BitXor', 'BitAnd', 'FloorDiv'> {}
-        scalar type unaryop extending enum<'Invert', 'Not', 'UAdd', 'USub'> {}
-        scalar type cmpop extending enum<'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn'> {}
         type comprehension {
             required link target -> expr;
             required link iter -> expr;
@@ -312,5 +311,10 @@ START MIGRATION TO {
             required property lineno -> int64;
             required property tag -> str;
         }
+        scalar type cmpop extending enum<'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn'> {}
+        scalar type expr_context extending enum<'Load', 'Store', 'Del', 'AugLoad', 'AugStore', 'Param'> {}
+        scalar type operator extending enum<'Add', 'Sub', 'Mult', 'MatMult', 'Div', 'Mod', 'Pow', 'LShift', 'RShift', 'BitOr', 'BitXor', 'BitAnd', 'FloorDiv'> {}
+        scalar type boolop extending enum<'And', 'Or'> {}
+        scalar type unaryop extending enum<'Invert', 'Not', 'UAdd', 'USub'> {}
     }
 };
