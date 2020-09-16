@@ -11,6 +11,17 @@ from reiz.ql.ast_to_ql import insert_file
 from reiz.ql.edgeql import Select
 from reiz.utilities import get_executor, logger, read_config
 
+FILE_CACHE = frozenset()
+
+
+def sync_cache(connector):
+    global FILE_CACHE
+    with connector() as connection:
+        selection = Select("Module", selections=["filename"])
+        result_set = connection.query(selection.construct())
+
+    FILE_CACHE = frozenset(module.filename for module in result_set)
+
 
 class Stats(NamedTuple):
     cached: int
@@ -36,18 +47,6 @@ class Stats(NamedTuple):
             return NotImplemented
 
 
-FILE_CACHE = frozenset()
-
-
-def sync_cache(connector):
-    global FILE_CACHE
-    with connector() as connection:
-        selection = Select("Module", selections=["filename"])
-        result_set = connection.query(selection.construct())
-
-    FILE_CACHE = frozenset(module.filename for module in result_set)
-
-
 def insert_project(connector, directory):
     inserted, cached, failed = 0, 0, 0
     with connector() as connection:
@@ -57,6 +56,8 @@ def insert_project(connector, directory):
                 cached += 1
                 continue
 
+            # FIX-ME(low): ignore InternalServerError from
+            # edgedb (too noisy and not our bugs)
             try:
                 insert_file(connection, file)
             except Exception:

@@ -118,7 +118,10 @@ def download_top_packages(
     packages = get_top_packages(days)[limit]
     packages = filter_already_downloaded(directory, packages)
     caches = []
+    # FIX-ME(low): get rid of try/finally and make sure
+    # all exceptions are suppresed in get_package
     try:
+        # FIX-ME(low): use reiz.utilities.get_executor
         with ThreadPoolExecutor(max_workers=workers) as executor:
             bound_downloader = partial(get_package, directory=directory)
             for package, package_directory in executor.map(

@@ -161,6 +161,11 @@ def insert(connection, ql_state, node):
     return connection.query_one(query)
 
 
+# FIX-ME(high): consider partial insertion of very big
+# module in order to avoid serialization bugs in EdgeDB.
+# e.g: defining a limit of N(30?) items, and breaking the
+# large lists up according to that limit and inserting
+# in multiple batches.
 def insert_file(connection, file):
     with tokenize.open(file) as file_p:
         source = file_p.read()

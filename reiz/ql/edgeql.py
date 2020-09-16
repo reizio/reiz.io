@@ -21,6 +21,11 @@ def ref(obj):
     return cast("uuid", str(obj.id))
 
 
+# FIX-ME(medium): ability to auto-construct
+# all child QLObject-s, so we could avoid
+# calling .construct() on every instance
+
+
 class QLObject:
     ...
 

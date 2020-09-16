@@ -58,6 +58,7 @@ def clean(dirty_dir: Path, clean_dir: Path, workers: int) -> None:
         project_paths[project_name] = directory
 
     results = []
+    # FIX-ME(low): use reiz.utilities.get_executor
     with ProcessPoolExecutor(max_workers=workers) as executor:
         bound_extractor = partial(extract, clean_dir=clean_dir)
         for project_name, destination_dir in executor.map(
