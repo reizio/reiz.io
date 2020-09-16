@@ -1,10 +1,7 @@
 import code
 from argparse import ArgumentParser
 
-import edgedb
-
 from reiz.db.connection import DEFAULT_DSN, DEFAULT_TABLE, connect
-from reiz.ql.ast_to_ql import insert_file
 
 
 def start(**db_opts):

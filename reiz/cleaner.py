@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import ast
-import json
 import shutil
 import tokenize
-import traceback
 import warnings
 from argparse import ArgumentParser
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from pathlib import Path
-from typing import List
 
 from reiz.utilities import logger, read_config, write_config
 

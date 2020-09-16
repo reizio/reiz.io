@@ -3,7 +3,7 @@ import contextlib
 import json
 import logging
 from concurrent.futures import ProcessPoolExecutor
-from functools import partial, partialmethod
+from functools import partialmethod
 from pathlib import Path
 from typing import ContextManager, List
 

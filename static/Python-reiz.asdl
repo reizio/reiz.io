@@ -6,7 +6,7 @@
 
 module Python
 {
-    mod = Module(stmt* body, type_ignore *type_ignores, string filename)
+    Module = (stmt* body, type_ignore *type_ignores, string filename)
     stmt = FunctionDef(identifier name, arguments args,
                        stmt* body, expr* decorator_list, expr? returns,
                        string? type_comment)
@@ -44,7 +44,7 @@ module Python
           | Nonlocal(identifier* names)
           | Expr(expr value)
           | Pass | Break | Continue
-          attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, mod? _module)
+          attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, Module? _module)
 
     expr = BoolOp(boolop op, expr* values)
          | NamedExpr(expr target, expr value)
@@ -74,13 +74,13 @@ module Python
          | Tuple(expr* elts, expr_context ctx)
          | Sentinel
 
-          attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, mod? _module)
+          attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, Module? _module)
 
     slice = Slice(expr? lower, expr? upper, expr? step)
           | ExtSlice(slice* dims)
           | Index(expr value)
 
-          attributes (expr sentinel, mod? _module)
+          attributes (expr sentinel)
 
     comprehension = (expr target, expr iter, expr* ifs, int is_async)
 

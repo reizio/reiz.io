@@ -5,12 +5,14 @@ from typing import List, Optional
 
 from reiz.db.schema import ENUM_TYPES, protected_name
 from reiz.ql.edgeql import (
-    ATOMIC_TYPES,
+    Call,
+    FilterItem,
     Insert,
     Prepared,
-    QLObject,
+    QLCompareOperator,
     Select,
     Update,
+    Variable,
     cast,
     ref,
     with_parens,
@@ -19,6 +21,9 @@ from reiz.utilities import logger
 
 # FIX-ME(low): extract all ast utilities into their own
 # module.
+
+
+MODULE_ANNOTATED_TYPES = (ast.expr, ast.stmt)
 
 
 def iter_attributes(node):
@@ -50,7 +55,7 @@ class Sentinel(ast.expr):
 
 alter_ast(ast.Module, "_fields", "filename")
 alter_ast(ast.slice, "_attributes", "sentinel")
-for sum_type in (ast.slice, ast.expr, ast.stmt):
+for sum_type in MODULE_ANNOTATED_TYPES:
     alter_ast(sum_type, "_attributes", "_module")
 
 
@@ -103,12 +108,11 @@ class QLAst(ast.NodeTransformer):
 @dataclass
 class QLState:
     from_parent: Optional[ast.AST] = None
-    selection_pool: List[Select] = field(default_factory=list)
+    reference_pool: List[str] = field(default_factory=list)
 
 
 def convert(connection, ql_state, obj):
     if isinstance(obj, ast.AST):
-        ql_state.from_parent = obj
         if isinstance(obj, ENUM_TYPES):
             obj_type = type(obj)
             enum_type = obj_type.__base__
@@ -117,14 +121,13 @@ def convert(connection, ql_state, obj):
             enum_name = protected_name(enum_type.__name__, prefix=True)
             return cast(enum_name, obj_name)
         else:
-            obj_ref = ref(insert(connection, ql_state, obj))
-            base_type = QLAst.infer_base(obj).__name__
+            db_obj = insert(connection, ql_state, obj)
+            ql_state.reference_pool.append(db_obj.id)
             selection = Select(
-                base_type,
+                QLAst.infer_base(obj).__name__,
                 limit=1,
-                filters={"id": obj_ref},
+                filters=FilterItem("id", ref(db_obj)),
             )
-            ql_state.selection_pool.append(selection)
             return with_parens(selection.construct())
     elif isinstance(obj, list):
         items = (convert(connection, ql_state, value) for value in obj)
@@ -138,7 +141,8 @@ def convert(connection, ql_state, obj):
     elif obj is None:
         return convert(connection, Sentinel())
     else:
-        message = f"Unexpected object: {obj}"
+        breakpoint()
+        message = f"Unexpected object: {obj!r}"
         if ql_state.from_parent is not None:
             message += f" flowing from {ql_state.from_parent}"
         raise ValueError(message + ".")
@@ -147,6 +151,7 @@ def convert(connection, ql_state, obj):
 def insert(connection, ql_state, node):
     node_type = type(node).__name__
     insertions = {}
+    ql_state.from_parent = node
     for field, value in (*ast.iter_fields(node), *iter_attributes(node)):
         if value is None:
             continue
@@ -161,22 +166,29 @@ def insert_file(connection, file):
         source = file_p.read()
     tree = QLAst.visit(ast.parse(source))
     # FIX-ME(low): remove <rawdata>/<provider> prefix
-    tree.filename = file
+    tree.filename = str(file)
     ql_state = QLState()
     with connection.transaction():
         module = insert(connection, ql_state, tree)
         module_select = with_parens(
-            Select("Module", limit=1, filters={"id": ref(module)}).construct()
+            Select(
+                "Module", limit=1, filters=FilterItem("id", ref(module))
+            ).construct()
         )
 
-        # FIX-ME(high): Optimize insertion of _module
-        # https://github.com/edgedb/edgedb/discussions/1777
-        for selection in ql_state.selection_pool:
-            if "_module" in getattr(ast, selection.name)._attributes:
-                update = Update(
-                    selection.name,
-                    filters=selection.filters,
-                    assigns={"_module": module_select},
-                ).construct()
-                logger.trace("Running query: %r", update)
-                connection.query_one(update)
+        ids = Variable("ids")
+        id_pool = cast("array<uuid>", ids)
+        unpacked_id_pool = Call("array_unpack", id_pool).construct()
+        update_filter = FilterItem(
+            "id", unpacked_id_pool, operator=QLCompareOperator.CONTAINS
+        )
+        # FIX-ME(low): research about how to do this in a single query
+        # instead of 3 seperate batches.
+        for base in MODULE_ANNOTATED_TYPES:
+            update = Update(
+                base.__name__,
+                filters=update_filter,
+                assigns={"_module": module_select},
+            ).construct()
+            logger.trace("Running post-insert query: %r", update)
+            connection.query(update, ids=ql_state.reference_pool)

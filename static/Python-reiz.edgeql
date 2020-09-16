@@ -1,8 +1,7 @@
 START MIGRATION TO {
     module ast {
         abstract type AST {}
-        abstract type mod {}
-        type PyModule extending mod, AST {
+        type PyModule {
             multi link body -> stmt;
             multi link type_ignores -> type_ignore;
             required property filename -> str { 
@@ -14,7 +13,7 @@ START MIGRATION TO {
             required property col_offset -> int64;
             property end_lineno -> int64;
             property end_col_offset -> int64;
-            link _module -> mod;
+            link _module -> PyModule;
         }
         type FunctionDef extending stmt, AST {
             required property name -> str;
@@ -134,7 +133,7 @@ START MIGRATION TO {
             required property col_offset -> int64;
             property end_lineno -> int64;
             property end_col_offset -> int64;
-            link _module -> mod;
+            link _module -> PyModule;
         }
         type BoolOp extending expr, AST {
             required property op -> boolop;
@@ -246,7 +245,6 @@ START MIGRATION TO {
         type Sentinel extending expr, AST {}
         abstract type slice {
             required link sentinel -> expr;
-            link _module -> mod;
         }
         type Slice extending slice, AST {
             link lower -> expr;

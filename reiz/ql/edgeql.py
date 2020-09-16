@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from enum import Enum, auto
+from typing import Any, Dict, List, Optional, Union
 
 from reiz.db.schema import protected_name
 
 ATOMIC_TYPES = (int, str)
+FilterKind = Union["FilterItem", "Filter"]
 
 
 def with_parens(node, combo="()"):
@@ -23,21 +25,53 @@ class QLObject:
     ...
 
 
+class QLLogicOperator(QLObject, Enum):
+    IN = auto()
+    OR = auto()
+    AND = auto()
+
+
+class QLCompareOperator(QLObject, Enum):
+    EQUALS = "="
+    CONTAINS = "in"
+
+    def construct(self):
+        return self.value
+
+
 class QLStatement(QLObject):
-    def prepare_arguments(
-        self, arguments, operator="=", key_prefix=None, protected=False
-    ):
+    def prepare_arguments(self, arguments, operator="=", protected=False):
         body = []
         for key, value in arguments.items():
             if protected:
                 key = protected_name(key, prefix=False)
             body.append(f"{key} {operator} {value}")
-            if key_prefix is not None:
-                body[-1] = key_prefix + body[-1]
         return ", ".join(body)
 
 
-@dataclass(frozen=True, unsafe_hash=True)
+# FIX-ME(low): Maybe use a **kwargs based system for filters
+@dataclass(unsafe_hash=True)
+class FilterItem(QLObject):
+    key: str
+    value: str
+    operator: QLCompareOperator = QLCompareOperator.EQUALS
+
+    def construct(self):
+        return f".{self.key} {self.operator.construct()} {self.value}"
+
+
+@dataclass(unsafe_hash=True)
+class Filter(QLObject):
+    left: FilterKind
+    right: FilterKind
+    operator: QLLogicOperator = QLLogicOperator.AND
+
+    def construct(self):
+        left, right = self.left.construct(), self.right.construct()
+        return left + " " + self.operator.construct() + " " + right
+
+
+@dataclass(unsafe_hash=True)
 class Prepared(QLObject):
     value: str
 
@@ -45,59 +79,71 @@ class Prepared(QLObject):
         return self.value
 
 
-@dataclass(frozen=True, unsafe_hash=True)
-class QLStatementWithParameters(QLStatement):
+@dataclass(unsafe_hash=True)
+class Variable(QLObject):
+    name: str
+
+    def __repr__(self):
+        return self.construct()
+
+    def construct(self):
+        return "$" + self.name
+
+
+class Call(QLObject):
+    def __init__(self, func: str, *args) -> None:
+        self.func = func
+        self.args = args
+
+    def construct(self):
+        return f"{self.func}(" + ", ".join(self.args) + ")"
+
+
+@dataclass(unsafe_hash=True)
+class Insert(QLStatement):
     name: str
     fields: Dict[str, Any] = field(default_factory=dict)
 
-    PARENS = "{}"
-    OPERATOR = "="
-
     def construct(self):
-        query = type(self).__name__.upper()
+        query = "INSERT"
         query += " " + protected_name(self.name)
         if arguments := self.prepare_arguments(
-            self.fields, operator=self.OPERATOR, protected=True
+            self.fields, operator=":=", protected=True
         ):
-            query += " " + with_parens(arguments, self.PARENS)
+            query += " " + with_parens(arguments, combo="{}")
         return query
 
 
-@dataclass(frozen=True, unsafe_hash=True)
-class Insert(QLStatementWithParameters):
-    OPERATOR = ":="
-
-
-@dataclass(frozen=True, unsafe_hash=True)
-class Select(QLStatementWithParameters):
+@dataclass(unsafe_hash=True)
+class Select(QLStatement):
+    name: str
     limit: Optional[int] = None
-    filters: Optional[Dict[str, Any]] = field(default_factory=dict)
+    filters: Optional[FilterKind] = None
+    selections: List[str] = field(default_factory=list)
 
     def construct(self):
-        query = super().construct()
-        if self.filters:
-            args = self.prepare_arguments(self.filters, key_prefix=".")
-            query += f" FILTER {with_parens(args)}"
+        query = "SELECT "
+        query += protected_name(self.name)
+        if self.selections:
+            query += with_parens(", ".join(self.selections), combo="{}")
+        if self.filters is not None:
+            query += f" FILTER {self.filters.construct()}"
         if self.limit is not None:
             query += f" LIMIT {self.limit}"
         return query
 
 
-@dataclass(frozen=True, unsafe_hash=True)
+@dataclass(unsafe_hash=True)
 class Update(QLStatement):
     name: str
     assigns: Dict[str, str] = field(default_factory=dict)
-    filters: Optional[Dict[str, str]] = field(default_factory=dict)
+    filters: Optional[FilterKind] = None
 
     def construct(self):
         query = "UPDATE"
         query += " " + protected_name(self.name)
-        if self.filters:
-            query += " FILTER "
-            filter_opts = (
-                f".{key} = {value}" for key, value in self.filters.items()
-            )
-            query += " AND ".join(filter_opts)
+        if self.filters is not None:
+            query += f" FILTER {self.filters.construct()}"
         query += " SET "
         query += with_parens(
             self.prepare_arguments(self.assigns, operator=":="), combo="{}"

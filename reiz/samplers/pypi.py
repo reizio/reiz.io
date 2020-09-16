@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import tarfile
-import traceback
 import zipfile
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
@@ -12,7 +10,7 @@ from functools import partial
 from pathlib import Path
 from typing import Generator, List, Literal, Optional, Tuple, Union, cast
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen, urlretrieve
+from urllib.request import urlopen, urlretrieve
 
 from reiz.utilities import logger, read_config, write_config
 

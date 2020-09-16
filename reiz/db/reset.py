@@ -1,6 +1,5 @@
 import subprocess
 from argparse import ArgumentParser
-from collections import Counter
 from contextlib import closing, suppress
 from pathlib import Path
 
