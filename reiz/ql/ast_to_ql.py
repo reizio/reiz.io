@@ -141,7 +141,6 @@ def convert(connection, ql_state, obj):
     elif obj is None:
         return convert(connection, Sentinel())
     else:
-        breakpoint()
         message = f"Unexpected object: {obj!r}"
         if ql_state.from_parent is not None:
             message += f" flowing from {ql_state.from_parent}"
