@@ -1,5 +1,6 @@
 import ast
 
+# FIX-ME(low): auto-generate these in the ./scripts/regen_db.sh
 ENUM_TYPES = (
     ast.expr_context,
     ast.boolop,
@@ -8,6 +9,7 @@ ENUM_TYPES = (
     ast.cmpop,
 )
 
+ATOMIC_TYPES = (int, str)
 
 RESERVED_NAMES = frozenset(
     (

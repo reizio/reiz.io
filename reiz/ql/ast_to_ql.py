@@ -118,7 +118,7 @@ def convert(connection, ql_state, obj):
             enum_type = obj_type.__base__
 
             obj_name = protected_name(obj_type.__name__, prefix=False)
-            enum_name = protected_name(enum_type.__name__, prefix=True)
+            enum_name = protected_name(enum_type.__name__)
             return cast(enum_name, obj_name)
         else:
             db_obj = insert(connection, ql_state, obj)

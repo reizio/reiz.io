@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
-from reiz.db.schema import protected_name
+from reiz.db.schema import ATOMIC_TYPES, protected_name
 
-ATOMIC_TYPES = (int, str)
 FilterKind = Union["FilterItem", "Filter"]
 
 
@@ -34,6 +33,9 @@ class QLLogicOperator(QLObject, Enum):
     IN = auto()
     OR = auto()
     AND = auto()
+
+    def construct(self):
+        return self.name
 
 
 class QLCompareOperator(QLObject, Enum):
@@ -124,7 +126,7 @@ class Select(QLStatement):
     name: str
     limit: Optional[int] = None
     filters: Optional[FilterKind] = None
-    selections: List[str] = field(default_factory=list)
+    selections: Sequence[str] = field(default_factory=list)
 
     def construct(self):
         query = "SELECT "
@@ -154,3 +156,25 @@ class Update(QLStatement):
             self.prepare_arguments(self.assigns, operator=":="), combo="{}"
         )
         return query
+
+
+@dataclass(unsafe_hash=True)
+class ListOf(QLStatement):
+    items: List[QLObject]
+
+    def construct(self):
+        return with_parens(
+            ", ".join(with_parens(item.construct()) for item in self.items),
+            combo="{}",
+        )
+
+
+@dataclass(unsafe_hash=True)
+class CastOf(QLStatement):
+    type: str
+    value: str
+
+    def construct(self):
+        return cast(
+            protected_name(self.type), protected_name(self.value, prefix=False)
+        )
