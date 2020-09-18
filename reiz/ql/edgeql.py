@@ -75,7 +75,13 @@ class Filter(QLObject):
 
     def construct(self):
         left, right = self.left.construct(), self.right.construct()
-        return left + " " + self.operator.construct() + " " + right
+        return (
+            with_parens(left)
+            + " "
+            + self.operator.construct()
+            + " "
+            + with_parens(right)
+        )
 
 
 @dataclass(unsafe_hash=True)

@@ -36,6 +36,13 @@ def query(source, limit=10, **db_opts):
         print(query)
         for result in conn.query(query):
             print(
+                result._module.filename
+                + ":"
+                + str(result.lineno)
+                + ":"
+                + str(result.col_offset)
+            )
+            print(
                 fetch(
                     result._module.filename,
                     lineno=result.lineno,

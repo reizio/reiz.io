@@ -1,0 +1,3 @@
+Name(id='foo')
+# GENERATED-CODE
+SELECT ast::Name FILTER .py_id = 'foo'

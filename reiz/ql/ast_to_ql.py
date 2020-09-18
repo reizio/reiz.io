@@ -139,7 +139,7 @@ def convert(connection, ql_state, obj):
     elif isinstance(obj, Prepared):
         return obj.value
     elif obj is None:
-        return convert(connection, Sentinel())
+        return convert(connection, ql_state, Sentinel())
     else:
         message = f"Unexpected object: {obj!r}"
         if ql_state.from_parent is not None:

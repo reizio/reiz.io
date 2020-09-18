@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import random
 import warnings
 from argparse import ArgumentParser
 from functools import partial
 from pathlib import Path
 from typing import NamedTuple
+
+from edgedb.errors import InternalServerError
 
 from reiz.db.connection import DEFAULT_DSN, DEFAULT_TABLE, connect
 from reiz.ql.ast_to_ql import insert_file
@@ -56,10 +59,14 @@ def insert_project(connector, directory):
                 cached += 1
                 continue
 
-            # FIX-ME(low): ignore InternalServerError from
-            # edgedb (too noisy and not our bugs)
             try:
                 insert_file(connection, file)
+            except InternalServerError:
+                failed += 1
+                logger.info(
+                    "%s couldn't inserted due to an edgedb related failure",
+                    file,
+                )
             except Exception:
                 failed += 1
                 logger.exception("%s couldn't inserted", file)
@@ -71,6 +78,7 @@ def insert_project(connector, directory):
 
 def insert(clean_dir, workers, **db_opts):
     cache = read_config(clean_dir / "info.json")
+    random.shuffle(cache)
     connector = partial(connect, **db_opts)
     bound_inserter = partial(insert_project, connector)
 

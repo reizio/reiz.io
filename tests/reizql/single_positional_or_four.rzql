@@ -1,0 +1,3 @@
+Name('foo' | 'bar' | 'baz' | 'doe')
+# GENERATED-CODE
+SELECT ast::Name FILTER (((.py_id = 'foo') OR (.py_id = 'bar')) OR (.py_id = 'baz')) OR (.py_id = 'doe')

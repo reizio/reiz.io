@@ -26,6 +26,7 @@ from typing import Dict, Iterator, List, Tuple, Union
 
 from reiz.db.schema import ATOMIC_TYPES, ENUM_TYPES, protected_name
 from reiz.ql.edgeql import (
+    CastOf,
     Filter,
     FilterItem,
     ListOf,
@@ -139,7 +140,7 @@ def generate_query(node: ast.Call) -> Union[QLNode, QLEnum]:
 
     origin = getattr(ast, name)
     if issubclass(origin, ENUM_TYPES):
-        return QLEnum(name, origin.__base__)
+        return QLEnum(name, origin.__base__.__name__)
 
     query = QLNode(name)
     for index, arg in enumerate(node.args):

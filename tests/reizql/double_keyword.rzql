@@ -1,0 +1,3 @@
+Name(id='foo', ctx=Store())
+# GENERATED-CODE
+SELECT ast::Name FILTER (.py_id = 'foo') AND (.ctx = <ast::expr_context>'Store')
