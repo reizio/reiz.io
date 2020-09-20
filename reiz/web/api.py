@@ -1,6 +1,7 @@
 import ast
 import tokenize
 
+import edgedb
 from flask import Flask, jsonify, request
 
 from reiz.db.connection import connect
@@ -60,7 +61,12 @@ def query():
 
     results = []
     with connect(**get_db_settings()) as conn:
-        for result in conn.query(query):
+        try:
+            query_set = conn.query(query)
+        except edgedb.errors.InvalidReferenceError as exc:
+            return jsonify({"error": exc.args[0]})
+
+        for result in query_set:
             results.append(
                 {
                     "source": fetch(

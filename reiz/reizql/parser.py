@@ -95,7 +95,7 @@ def convert(node):
         if type(node.value) is int:
             value = node.value
         else:
-            value = str(repr(node.value))
+            value = repr(repr(node.value))
         return ReizQLConstant(value)
     elif isinstance(node, ast.List):
         ensure(
