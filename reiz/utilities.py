@@ -3,6 +3,7 @@ import contextlib
 import json
 import logging
 from concurrent.futures import ProcessPoolExecutor
+from enum import Enum
 from functools import partialmethod
 from pathlib import Path
 from typing import ContextManager, List
@@ -46,3 +47,11 @@ def read_config(config: Path) -> List[str]:
 def write_config(config: Path, data: List[str]) -> None:
     with open(config, "w") as config:
         json.dump(data, config)
+
+
+class ReizEnum(Enum):
+    # normal __repr__: <$cls.$name: $value>
+    # ReizEnum __repr__: $cls.$name
+
+    def __repr__(self):
+        return str(self)

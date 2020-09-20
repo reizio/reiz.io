@@ -9,6 +9,8 @@ ENUM_TYPES = (
     ast.cmpop,
 )
 
+MODULE_ANNOTATED_TYPES = (ast.expr, ast.stmt)
+
 ATOMIC_TYPES = (int, str)
 
 RESERVED_NAMES = frozenset(

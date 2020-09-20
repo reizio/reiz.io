@@ -10,8 +10,8 @@ from typing import NamedTuple
 from edgedb.errors import InternalServerError
 
 from reiz.db.connection import DEFAULT_DSN, DEFAULT_TABLE, connect
-from reiz.ql.ast_to_ql import insert_file
-from reiz.ql.edgeql import Select
+from reiz.edgeql import EdgeQLSelect, EdgeQLSelector
+from reiz.serialization.serializer import insert_file
 from reiz.utilities import get_executor, logger, read_config
 
 FILE_CACHE = frozenset()
@@ -20,7 +20,9 @@ FILE_CACHE = frozenset()
 def sync_cache(connector):
     global FILE_CACHE
     with connector() as connection:
-        selection = Select("Module", selections=["filename"])
+        selection = EdgeQLSelect(
+            "Module", selections=[EdgeQLSelector("filename")]
+        )
         result_set = connection.query(selection.construct())
 
     FILE_CACHE = frozenset(module.filename for module in result_set)
