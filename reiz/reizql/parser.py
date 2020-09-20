@@ -71,6 +71,10 @@ def convert(node):
             value = str(repr(node.value))
         return ReizQLConstant(value)
     elif isinstance(node, ast.List):
+        ensure(
+            all(isinstance(item, ast.Call) for item in node.elts),
+            "A list may only contain matchers, not atoms",
+        )
         return ReizQLList([convert(item) for item in node.elts])
     elif isinstance(node, ast.Set):
         return ReizQLSet([convert(item) for item in node.elts])

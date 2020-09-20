@@ -83,6 +83,21 @@ def make_filter(**kwargs):
 
 
 @dataclass(unsafe_hash=True)
+class EdgeQLWithBlock(EdgeQLStatement):
+    assignments: Dict[str, EdgeQLObject] = field(default_factory=dict)
+
+    def construct(self):
+        query = "WITH"
+        if not self.assignments:
+            raise ValueError("Empty WITH blocks are not allowed!")
+        query += " " + ", ".join(
+            f"{assignment} := {construct(value)}"
+            for assignment, value in self.assignments.items()
+        )
+        return query
+
+
+@dataclass(unsafe_hash=True)
 class EdgeQLInsert(EdgeQLStatement):
     name: str
     fields: Dict[str, EdgeQLObject] = field(default_factory=dict)
@@ -107,10 +122,13 @@ class EdgeQLSelect(EdgeQLStatement):
     limit: Optional[int] = None
     filters: Optional[EdgeQLFilterT] = None
     selections: Sequence[EdgeQLSelector] = field(default_factory=list)
+    with_block: Optional[EdgeQLWithBlock] = None
 
     def construct(self):
         query = "SELECT "
         query += protected_name(self.name)
+        if self.with_block:
+            query = construct(self.with_block, top_level=True) + " " + query
         if self.selections:
             query += with_parens(
                 ", ".join(construct_sequence(self.selections)), combo="{}"

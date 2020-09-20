@@ -31,8 +31,6 @@ def construct(value, top_level=False):
             return with_parens(result)
         else:
             return result
-    elif type(value) is int:
-        return value
     else:
         return str(value)
 
