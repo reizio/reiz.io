@@ -35,7 +35,6 @@ def query(source, limit=10, show_source=True, **db_opts):
         ]
 
         query = construct(selection, top_level=True)
-        print(query)
         logger.info("EdgeQL query: %r", query)
 
         for result in conn.query(query):

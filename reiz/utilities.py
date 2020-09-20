@@ -8,6 +8,10 @@ from functools import partialmethod
 from pathlib import Path
 from typing import ContextManager, List
 
+from reiz.db.connection import DEFAULT_DSN, DEFAULT_TABLE
+
+DEFAULT_CONFIG_PATH = Path("~/.local/reiz.json")
+
 
 def add_logging_level(name, value):
     logger_cls = logging.getLoggerClass()
@@ -47,6 +51,14 @@ def read_config(config: Path) -> List[str]:
 def write_config(config: Path, data: List[str]) -> None:
     with open(config, "w") as config:
         json.dump(data, config)
+
+
+def get_db_settings():
+    if DEFAULT_CONFIG_PATH.exists():
+        with open(DEFAULT_CONFIG_PATH) as file:
+            return json.load(file)
+    else:
+        return {"dsn": DEFAULT_DSN, "table": DEFAULT_TABLE}
 
 
 class ReizEnum(Enum):
