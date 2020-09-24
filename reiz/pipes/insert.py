@@ -63,7 +63,7 @@ def insert_project(connector, directory):
 
             try:
                 insert_file(connection, file)
-            except InternalServerError:
+            except ArithmeticError:
                 failed += 1
                 logger.info(
                     "%s couldn't inserted due to an edgedb related failure",

@@ -2,10 +2,14 @@ START MIGRATION TO {
     module ast {
         abstract type AST {}
         type PyModule {
-            multi link body -> stmt;
-            multi link type_ignores -> type_ignore;
-            required property filename -> str { 
-                constraint exclusive; 
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link type_ignores -> type_ignore {
+                property index -> int64;
+            };
+            required property filename -> str {
+                constraint exclusive;
             };
         }
         abstract type stmt {
@@ -18,34 +22,54 @@ START MIGRATION TO {
         type FunctionDef extending stmt, AST {
             required property name -> str;
             required link args -> arguments;
-            multi link body -> stmt;
-            multi link decorator_list -> expr;
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link decorator_list -> expr {
+                property index -> int64;
+            };
             link returns -> expr;
             property type_comment -> str;
         }
         type AsyncFunctionDef extending stmt, AST {
             required property name -> str;
             required link args -> arguments;
-            multi link body -> stmt;
-            multi link decorator_list -> expr;
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link decorator_list -> expr {
+                property index -> int64;
+            };
             link returns -> expr;
             property type_comment -> str;
         }
         type ClassDef extending stmt, AST {
             required property name -> str;
-            multi link bases -> expr;
-            multi link keywords -> keyword;
-            multi link body -> stmt;
-            multi link decorator_list -> expr;
+            multi link bases -> expr {
+                property index -> int64;
+            };
+            multi link keywords -> keyword {
+                property index -> int64;
+            };
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link decorator_list -> expr {
+                property index -> int64;
+            };
         }
         type Return extending stmt, AST {
             link value -> expr;
         }
         type PyDelete extending stmt, AST {
-            multi link targets -> expr;
+            multi link targets -> expr {
+                property index -> int64;
+            };
         }
         type Assign extending stmt, AST {
-            multi link targets -> expr;
+            multi link targets -> expr {
+                property index -> int64;
+            };
             required link value -> expr;
             property type_comment -> str;
         }
@@ -63,35 +87,59 @@ START MIGRATION TO {
         type PyFor extending stmt, AST {
             required link target -> expr;
             required link iter -> expr;
-            multi link body -> stmt;
-            multi link orelse -> stmt;
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link orelse -> stmt {
+                property index -> int64;
+            };
             property type_comment -> str;
         }
         type AsyncFor extending stmt, AST {
             required link target -> expr;
             required link iter -> expr;
-            multi link body -> stmt;
-            multi link orelse -> stmt;
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link orelse -> stmt {
+                property index -> int64;
+            };
             property type_comment -> str;
         }
         type While extending stmt, AST {
             required link test -> expr;
-            multi link body -> stmt;
-            multi link orelse -> stmt;
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link orelse -> stmt {
+                property index -> int64;
+            };
         }
         type PyIf extending stmt, AST {
             required link test -> expr;
-            multi link body -> stmt;
-            multi link orelse -> stmt;
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link orelse -> stmt {
+                property index -> int64;
+            };
         }
         type PyWith extending stmt, AST {
-            multi link items -> withitem;
-            multi link body -> stmt;
+            multi link items -> withitem {
+                property index -> int64;
+            };
+            multi link body -> stmt {
+                property index -> int64;
+            };
             property type_comment -> str;
         }
         type AsyncWith extending stmt, AST {
-            multi link items -> withitem;
-            multi link body -> stmt;
+            multi link items -> withitem {
+                property index -> int64;
+            };
+            multi link body -> stmt {
+                property index -> int64;
+            };
             property type_comment -> str;
         }
         type PyRaise extending stmt, AST {
@@ -99,21 +147,33 @@ START MIGRATION TO {
             link cause -> expr;
         }
         type Try extending stmt, AST {
-            multi link body -> stmt;
-            multi link handlers -> excepthandler;
-            multi link orelse -> stmt;
-            multi link finalbody -> stmt;
+            multi link body -> stmt {
+                property index -> int64;
+            };
+            multi link handlers -> excepthandler {
+                property index -> int64;
+            };
+            multi link orelse -> stmt {
+                property index -> int64;
+            };
+            multi link finalbody -> stmt {
+                property index -> int64;
+            };
         }
         type Assert extending stmt, AST {
             required link test -> expr;
             link msg -> expr;
         }
         type PyImport extending stmt, AST {
-            multi link names -> alias;
+            multi link names -> alias {
+                property index -> int64;
+            };
         }
         type ImportFrom extending stmt, AST {
             property py_module -> str;
-            multi link names -> alias;
+            multi link names -> alias {
+                property index -> int64;
+            };
             property level -> int64;
         }
         type PyGlobal extending stmt, AST {
@@ -137,7 +197,9 @@ START MIGRATION TO {
         }
         type BoolOp extending expr, AST {
             required property op -> boolop;
-            multi link values -> expr;
+            multi link values -> expr {
+                property index -> int64;
+            };
         }
         type NamedExpr extending expr, AST {
             required link target -> expr;
@@ -162,28 +224,42 @@ START MIGRATION TO {
             required link orelse -> expr;
         }
         type Dict extending expr, AST {
-            multi link keys -> expr;
-            multi link values -> expr;
+            multi link keys -> expr {
+                property index -> int64;
+            };
+            multi link values -> expr {
+                property index -> int64;
+            };
         }
         type PySet extending expr, AST {
-            multi link elts -> expr;
+            multi link elts -> expr {
+                property index -> int64;
+            };
         }
         type ListComp extending expr, AST {
             required link elt -> expr;
-            multi link generators -> comprehension;
+            multi link generators -> comprehension {
+                property index -> int64;
+            };
         }
         type SetComp extending expr, AST {
             required link elt -> expr;
-            multi link generators -> comprehension;
+            multi link generators -> comprehension {
+                property index -> int64;
+            };
         }
         type DictComp extending expr, AST {
             required link key -> expr;
             required link value -> expr;
-            multi link generators -> comprehension;
+            multi link generators -> comprehension {
+                property index -> int64;
+            };
         }
         type GeneratorExp extending expr, AST {
             required link elt -> expr;
-            multi link generators -> comprehension;
+            multi link generators -> comprehension {
+                property index -> int64;
+            };
         }
         type Await extending expr, AST {
             required link value -> expr;
@@ -197,12 +273,18 @@ START MIGRATION TO {
         type Compare extending expr, AST {
             required link left -> expr;
             multi property ops -> cmpop;
-            multi link comparators -> expr;
+            multi link comparators -> expr {
+                property index -> int64;
+            };
         }
         type Call extending expr, AST {
             required link func -> expr;
-            multi link args -> expr;
-            multi link keywords -> keyword;
+            multi link args -> expr {
+                property index -> int64;
+            };
+            multi link keywords -> keyword {
+                property index -> int64;
+            };
         }
         type FormattedValue extending expr, AST {
             required link value -> expr;
@@ -210,7 +292,9 @@ START MIGRATION TO {
             link format_spec -> expr;
         }
         type JoinedStr extending expr, AST {
-            multi link values -> expr;
+            multi link values -> expr {
+                property index -> int64;
+            };
         }
         type Constant extending expr, AST {
             required property value -> str;
@@ -235,11 +319,15 @@ START MIGRATION TO {
             required property ctx -> expr_context;
         }
         type List extending expr, AST {
-            multi link elts -> expr;
+            multi link elts -> expr {
+                property index -> int64;
+            };
             required property ctx -> expr_context;
         }
         type Tuple extending expr, AST {
-            multi link elts -> expr;
+            multi link elts -> expr {
+                property index -> int64;
+            };
             required property ctx -> expr_context;
         }
         type Sentinel extending expr, AST {}
@@ -252,7 +340,9 @@ START MIGRATION TO {
             link step -> expr;
         }
         type ExtSlice extending slice, AST {
-            multi link dims -> slice;
+            multi link dims -> slice {
+                property index -> int64;
+            };
         }
         type Index extending slice, AST {
             required link value -> expr;
@@ -260,7 +350,9 @@ START MIGRATION TO {
         type comprehension {
             required link target -> expr;
             required link iter -> expr;
-            multi link ifs -> expr;
+            multi link ifs -> expr {
+                property index -> int64;
+            };
             required property is_async -> int64;
         }
         abstract type excepthandler {
@@ -272,16 +364,28 @@ START MIGRATION TO {
         type ExceptHandler extending excepthandler, AST {
             link type -> expr;
             property name -> str;
-            multi link body -> stmt;
+            multi link body -> stmt {
+                property index -> int64;
+            };
         }
         type arguments {
-            multi link posonlyargs -> arg;
-            multi link args -> arg;
+            multi link posonlyargs -> arg {
+                property index -> int64;
+            };
+            multi link args -> arg {
+                property index -> int64;
+            };
             link vararg -> arg;
-            multi link kwonlyargs -> arg;
-            multi link kw_defaults -> expr;
+            multi link kwonlyargs -> arg {
+                property index -> int64;
+            };
+            multi link kw_defaults -> expr {
+                property index -> int64;
+            };
             link kwarg -> arg;
-            multi link defaults -> expr;
+            multi link defaults -> expr {
+                property index -> int64;
+            };
         }
         type arg {
             required property arg -> str;

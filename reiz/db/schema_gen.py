@@ -18,6 +18,7 @@ EDGEQL_BASICS = {
 }
 
 UNIQUE_FIELDS = ["filename"]
+ENUM_TYPES = set()
 
 
 class FieldConstraint(Enum):
@@ -34,15 +35,17 @@ class ModelConstraint(Enum):
 class QLField:
     name: str
     qualifier: str
-    constraint: Optional[FieldConstraint]
+    constraint: Optional[FieldConstraint] = None
+    properties: List[str] = field(default_factory=list)
     is_property: Optional[bool] = None
-    is_unique: Optional[bool] = None
+    is_sum_type: bool = False
 
     def __post_init__(self):
         if self.is_property is None:
             self.is_property = self.qualifier in EDGEQL_BASICS
-        if self.is_unique is None:
-            self.is_unique = self.name in UNIQUE_FIELDS
+
+        if self.name in UNIQUE_FIELDS:
+            self.properties.append("constraint exclusive;")
 
     def __str__(self):
         properties = []
@@ -57,15 +60,26 @@ class QLField:
         properties.append(protected_name(self.name, prefix=False))
         properties.append("->")
         properties.append(self.type)
-        if self.is_unique:
+
+        if self.properties:
             properties.append("{")
-            properties.append("\n" + DEFAULT_INDENT * 2 + "constraint")
-            properties.append("exclusive;")
+        for inner_property in self.properties:
+            properties.append("\n" + DEFAULT_INDENT * 2 + inner_property)
+        if self.properties:
             properties.append("\n" + DEFAULT_INDENT + "}")
+
         return " ".join(properties) + ";"
 
     @property
     def type(self):
+        if (
+            self.constraint is FieldConstraint.MULTI
+            and not self.is_property
+            and self.qualifier not in ENUM_TYPES
+            and self.qualifier not in EDGEQL_BASICS
+        ):
+            self.properties.append(str(QLField("index", "int")))
+
         if self.qualifier in EDGEQL_BASICS:
             return EDGEQL_BASICS[self.qualifier]
         else:
@@ -112,7 +126,6 @@ def as_enum(names):
 
 class GraphQLGenerator(pyasdl.ASDLVisitor):
     def visit_Module(self, node):
-        self.enums = set()
         definitions = [QLModel("AST", constraint=ModelConstraint.ABSTRACT)]
         for definition in node.body:
             definitions.extend(self.visit(definition))
@@ -121,7 +134,7 @@ class GraphQLGenerator(pyasdl.ASDLVisitor):
     def fix_references(self, definitions):
         for definition in definitions:
             for field in definition.fields:
-                if field.qualifier in self.enums:
+                if field.qualifier in ENUM_TYPES:
                     field.is_property = True
             yield definition
 
@@ -138,7 +151,7 @@ class GraphQLGenerator(pyasdl.ASDLVisitor):
     def visit_Sum(self, node, name):
         constructor_names = [constructor.name for constructor in node.types]
         if is_simple(node):
-            self.enums.add(name)
+            ENUM_TYPES.add(name)
             yield QLModel(
                 name,
                 constraint=ModelConstraint.SCALAR,
@@ -180,7 +193,10 @@ def main():
     print("START MIGRATION TO {")
     print(DEFAULT_INDENT + "module ast {")
     for ql_type in visitor.visit(tree):
-        print(textwrap.indent(str(ql_type), DEFAULT_INDENT * 2))
+        for line in textwrap.indent(
+            str(ql_type), DEFAULT_INDENT * 2
+        ).splitlines():
+            print(line.rstrip())
     print(DEFAULT_INDENT + "}")
     print("};")
 

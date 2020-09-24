@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from reiz.db.schema import protected_name
+
 
 class EdgeQLObject(ABC):
     @abstractmethod
@@ -33,6 +35,13 @@ def construct(value, top_level=False):
             return result
     else:
         return str(value)
+
+
+def protected_construct(value):
+    if isinstance(value, str):
+        return protected_name(value)
+    else:
+        return construct(value)
 
 
 def construct_sequence(sequence):

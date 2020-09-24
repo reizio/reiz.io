@@ -14,6 +14,14 @@ from reiz.utilities import ReizEnum
 
 
 @EdgeQLExpression.register
+class EdgeQLVerifyOperator(ReizEnum):
+    IS = auto()
+
+    def construct(self):
+        return self.name
+
+
+@EdgeQLExpression.register
 class EdgeQLLogicOperator(ReizEnum):
     IN = auto()
     OR = auto()
@@ -79,6 +87,20 @@ class EdgeQLVariable(EdgeQLSpecialName):
 @dataclass(unsafe_hash=True)
 class EdgeQLFilterKey(EdgeQLSpecialName):
     PREFIX = "."
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLProperty(EdgeQLSpecialName):
+    PREFIX = "@"
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLAttribute(EdgeQLExpression):
+    base: EdgeQLObject
+    attr: str
+
+    def construct(self):
+        return construct(self.base) + "." + self.attr
 
 
 @dataclass(unsafe_hash=True)

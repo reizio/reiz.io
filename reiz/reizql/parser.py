@@ -1,4 +1,5 @@
 import ast
+import functools
 
 from reiz.db.schema import ATOMIC_TYPES, ENUM_TYPES
 from reiz.reizql.nodes import (
@@ -43,71 +44,84 @@ class ReizQLSyntaxError(Exception):
 
 def ensure(condition, node, message="Invalid syntax"):
     if not condition:
-        raise ReizQLSyntaxError.from_node(message, node)
+        raise ReizQLSyntaxError.from_node(node, message)
 
 
-def convert(node):
-    if isinstance(node, ast.Call):
-        ensure(isinstance(node.func, ast.Name), node)
+@functools.singledispatch
+def parse(node):
+    raise ReizQLSyntaxError.from_node(node, "Invalid syntax")
 
-        name = node.func.id
-        ensure(hasattr(ast, node.func.id), node, f"Unknown matcher: {name!r}")
 
-        origin = getattr(ast, name)
-        origin_type = type(node)
+@parse.register(ast.Call)
+def parse_call(node):
+    ensure(isinstance(node.func, ast.Name), node)
 
-        if isinstance(origin, ENUM_TYPES):
-            return ReizQLMatchEnum(name, origin_type.__base__.__name__)
-        else:
-            query = {}
+    name = node.func.id
+    ensure(hasattr(ast, node.func.id), node, f"Unknown matcher: {name!r}")
 
-            for index, arg in enumerate(node.args):
-                ensure(
-                    index < len(node._fields),
-                    node,
-                    f"Too many positional arguments for {name!r}",
-                )
-                query[origin._fields[index]] = convert(arg)
-
-            for arg in node.keywords:
-                ensure(
-                    arg.arg not in node.args,
-                    node,
-                    f"{arg.arg} specified with both positional and keyword arg",
-                )
-                query[arg.arg] = convert(arg.value)
-
-            return ReizQLMatch(name, query)
-    elif isinstance(node, ast.BinOp):
-        if isinstance(node.op, ast.BitOr):
-            operator = ReizQLLogicOperator.OR
-        else:
-            raise ReizQLSyntaxError.from_node(
-                node.op, f"Unknown logical operation: {type(node.op).__name__}"
-            )
-
-        return ReizQLLogicalOperation(
-            left=convert(node.left),
-            right=convert(node.right),
-            operator=operator,
-        )
-    elif isinstance(node, ast.Constant):
-        if type(node.value) is int:
-            value = node.value
-        else:
-            value = repr(repr(node.value))
-        return ReizQLConstant(value)
-    elif isinstance(node, ast.List):
-        ensure(
-            all(isinstance(item, ast.Call) for item in node.elts),
-            node,
-            "A list may only contain matchers, not atoms",
-        )
-        return ReizQLList([convert(item) for item in node.elts])
-    elif isinstance(node, ast.Set):
-        return ReizQLSet([convert(item) for item in node.elts])
+    origin = getattr(ast, name)
+    if issubclass(origin, ENUM_TYPES):
+        return ReizQLMatchEnum(origin.__base__.__name__, name)
     else:
-        raise ReizQLSyntaxError.from_node(node, "Invalid syntax")
+        query = {}
+
+        for index, arg in enumerate(node.args):
+            ensure(
+                index < len(node._fields),
+                node,
+                f"Too many positional arguments for {name!r}",
+            )
+            query[origin._fields[index]] = parse(arg)
+
+        for arg in node.keywords:
+            ensure(
+                arg.arg not in node.args,
+                node,
+                f"{arg.arg} specified with both positional and keyword arg",
+            )
+            query[arg.arg] = parse(arg.value)
+
+        return ReizQLMatch(name, query)
+
+
+@parse.register(ast.BinOp)
+def parse_binop(node):
+    if isinstance(node.op, ast.BitOr):
+        operator = ReizQLLogicOperator.OR
+    else:
+        raise ReizQLSyntaxError.from_node(
+            node.op, f"Unknown logical operation: {type(node.op).__name__}"
+        )
+
+    return ReizQLLogicalOperation(
+        left=parse(node.left),
+        right=parse(node.right),
+        operator=operator,
+    )
+
+
+@parse.register(ast.Constant)
+def parse_constant(node):
+    if type(node.value) is int:
+        value = repr(node.value)
+    else:
+        value = repr(str(node.value))
+    return ReizQLConstant(repr(str(node.value)))
+
+
+@parse.register(ast.List)
+def parse_list(node):
+    ensure(
+        all(isinstance(item, ast.Call) for item in node.elts),
+        node,
+        "A list may only contain matchers, not atoms",
+    )
+    return ReizQLList([parse(item) for item in node.elts])
+
+
+@parse.register(ast.Set)
+def parse_set(node):
+    return ReizQLSet([parse(item) for item in node.elts])
 
 
 def parse_query(source):
@@ -115,7 +129,7 @@ def parse_query(source):
     ensure(len(tree.body) == 1, tree)
     ensure(isinstance(tree.body[0], ast.Expr), tree.body[0])
     ensure(isinstance(tree.body[0].value, ast.Call), tree.body[0].value)
-    return convert(tree.body[0].value)
+    return parse(tree.body[0].value)
 
 
 def main():

@@ -10,12 +10,14 @@ from reiz.edgeql.base import (
     EdgeQLStatement,
     construct,
     construct_sequence,
+    protected_construct,
     with_parens,
 )
 from reiz.edgeql.expr import (
     EdgeQLComparisonOperator,
     EdgeQLFilterKey,
     EdgeQLLogicOperator,
+    EdgeQLVerifyOperator,
 )
 
 
@@ -82,6 +84,34 @@ def make_filter(**kwargs):
     return query
 
 
+def unpack_filters(filters, operator=None):
+    if isinstance(filters, EdgeQLFilter):
+        yield filters, operator
+    else:
+        yield from unpack_filters(filters.left, filters.operator)
+        yield from unpack_filters(filters.right, filters.operator)
+
+
+def merge_filters(left_filter, right_filter, operator=None):
+    if left_filter is None:
+        return right_filter
+    else:
+        operator = operator or EdgeQLLogicOperator.AND
+        return EdgeQLFilterChain(left_filter, right_filter, operator)
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLVerify(EdgeQLComponent):
+    query: EdgeQLObject
+    operator: EdgeQLVerifyOperator
+    argument: EdgeQLObject
+
+    def construct(self):
+        query = construct(self.query)
+        check = construct(self.operator) + " " + construct(self.argument)
+        return query + with_parens(check, combo="[]")
+
+
 @dataclass(unsafe_hash=True)
 class EdgeQLWithBlock(EdgeQLStatement):
     assignments: Dict[str, EdgeQLObject] = field(default_factory=dict)
@@ -118,23 +148,31 @@ class EdgeQLInsert(EdgeQLStatement):
 
 @dataclass(unsafe_hash=True)
 class EdgeQLSelect(EdgeQLStatement):
-    name: str
+    name: EdgeQLObject = None
     limit: Optional[int] = None
+    offset: Optional[int] = None
+    ordered: Optional[EdgeQLObject] = None
     filters: Optional[EdgeQLFilterT] = None
     selections: Sequence[EdgeQLSelector] = field(default_factory=list)
     with_block: Optional[EdgeQLWithBlock] = None
 
     def construct(self):
-        query = "SELECT "
-        query += protected_name(self.name)
         if self.with_block:
-            query = construct(self.with_block, top_level=True) + " " + query
+            query = construct(self.with_block, top_level=True) + " SELECT"
+        else:
+            query = "SELECT"
+
+        query += " " + protected_construct(self.name)
         if self.selections:
             query += with_parens(
                 ", ".join(construct_sequence(self.selections)), combo="{}"
             )
         if self.filters is not None:
             query += f" FILTER {construct(self.filters)}"
+        if self.ordered is not None:
+            query += f" ORDER BY {construct(self.ordered)}"
+        if self.offset is not None:
+            query += f" OFFSET {self.offset}"
         if self.limit is not None:
             query += f" LIMIT {self.limit}"
         return query
@@ -159,4 +197,35 @@ class EdgeQLUpdate(EdgeQLStatement):
             ),
             combo="{}",
         )
+        return query
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLFor(EdgeQLStatement):
+    target: EdgeQLObject
+    iterator: EdgeQLObject
+    generator: EdgeQLObject
+
+    def construct(self):
+        query = "FOR "
+        query += construct(self.target)
+        query += " in "
+        query += construct(self.iterator)
+        query += " UNION "
+        query += construct(self.generator)
+        return query
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLReizCustomList(EdgeQLStatement):
+    items: EdgeQLSet
+
+    # FIX-ME(low): Maybe refactor this to it's own components
+    def construct(self):
+        query = "WITH"
+        query += " __items := "
+        query += construct(self.items)
+        query += ", "
+        query += "FOR __item IN {enumerate(__items)} "
+        query += "UNION (SELECT __item.1 { @index := __item.0 })"
         return query

@@ -4,7 +4,6 @@ import logging
 from argparse import ArgumentParser
 
 from reiz.db.connection import simple_connection
-from reiz.ql.ast_to_ql import insert_file
 from reiz.serialization.serializer import insert_file
 from reiz.utilities import logger
 
