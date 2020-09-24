@@ -35,6 +35,7 @@ class EdgeQLLogicOperator(ReizEnum):
 class EdgeQLComparisonOperator(ReizEnum):
     EQUALS = "="
     CONTAINS = "IN"
+    IDENTICAL = "IS"
     NOT_EQUALS = "!="
 
     def construct(self):

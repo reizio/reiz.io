@@ -105,18 +105,16 @@ def generate_typechecked_query(filters, base):
 
 @compile_edgeql.register(ReizQLList)
 def convert_list(node, state):
-    quantity_verifier = EdgeQLFilter(
+    object_verifier = EdgeQLFilter(
         EdgeQLCall("count", [EdgeQLFilterKey(state.pointer)]), len(node.items)
     )
     if len(node.items) == 0:
         return quantity_verifier
 
-    key_types = []
     assignments = {}
     select_filters = None
     for index, item in enumerate(node.items):
         assert isinstance(item, ReizQLMatch)
-        key_types.append(item.name)
         selection = EdgeQLSelect(
             EdgeQLFilterKey(state.pointer),
             ordered=EdgeQLProperty("index"),
@@ -125,72 +123,40 @@ def convert_list(node, state):
         )
         filters = convert_match(item).filters
 
+        # If there are no value queries, only type-check
         if filters is None:
-            continue
-
-        assignments[f"__item_{index}"] = EdgeQLVerify(
-            selection,
-            EdgeQLVerifyOperator.IS,
-            protected_name(item.name, prefix=True),
-        )
-        select_filters = merge_filters(
-            select_filters,
-            generate_typechecked_query(filters, f"__item_{index}"),
-        )
-
-    for ql_type in set(key_types):
-        state.assignments[ql_type] = EdgeQLSelect(
-            EdgeQLPreparedQuery("schema::ObjectType"),
-            filters=make_filter(
-                name=repr(protected_name(ql_type, prefix=True))
-            ),
-        )
-
-    # array_agg((FOR KEY in {(SELECT .keys ORDER BY @index)} UNION KEY.__type__.id)) = [Constant.id, Call.id]
-    iterator = EdgeQLSet(
-        [
-            EdgeQLSelect(
-                EdgeQLFilterKey(state.pointer),
-                ordered=EdgeQLProperty("index"),
-            )
-        ]
-    )
-
-    list_type_checker = EdgeQLCall(
-        "array_agg",
-        [
-            EdgeQLFor(
-                target=__DEFAULT_FOR_TARGET,
-                iterator=iterator,
-                generator=EdgeQLAttribute(
-                    EdgeQLAttribute(
-                        __DEFAULT_FOR_TARGET,
-                        "__type__",
-                    ),
-                    "id",
+            select_filters = merge_filters(
+                select_filters,
+                EdgeQLFilter(
+                    selection,
+                    protected_name(item.name, prefix=True),
+                    EdgeQLComparisonOperator.IDENTICAL,
                 ),
             )
-        ],
-    )
+        else:
+            assignments[f"__item_{index}"] = EdgeQLVerify(
+                selection,
+                EdgeQLVerifyOperator.IS,
+                protected_name(item.name, prefix=True),
+            )
+            select_filters = merge_filters(
+                select_filters,
+                generate_typechecked_query(filters, f"__item_{index}"),
+            )
 
-    type_verifier = EdgeQLFilter(
-        list_type_checker,
-        EdgeQLArray(
-            [EdgeQLAttribute(key_type, "id") for key_type in key_types]
-        ),
-    )
+    if assignments:
+        with_block = EdgeQLWithBlock(assignments)
+    else:
+        with_block = None
 
-    object_verifier = EdgeQLFilterChain(quantity_verifier, type_verifier)
-    if select_filters:
-        value_verifier = EdgeQLSelect(
-            select_filters,
-            with_block=EdgeQLWithBlock(assignments),
-        )
-        object_verifier = EdgeQLFilterChain(
-            object_verifier,
-            value_verifier,
-        )
-    return object_verifier
+    value_verifier = EdgeQLSelect(
+        select_filters,
+        with_block=with_block,
+    )
+    return EdgeQLFilterChain(
+        object_verifier,
+        value_verifier,
+    )
 
 
 @compile_edgeql.register(ReizQLConstant)
