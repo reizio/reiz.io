@@ -113,7 +113,7 @@ def download_top_packages(
 ) -> Generator[Path, None, None]:
     directory.mkdir(exist_ok=True)
     if not (directory / "info.json").exists():
-        dump_config(directory, [])
+        write_config(directory, [])
 
     packages = get_top_packages(days)[limit]
     packages = filter_already_downloaded(directory, packages)
