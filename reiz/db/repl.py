@@ -1,7 +1,8 @@
 import code
 from argparse import ArgumentParser
 
-from reiz.db.connection import DEFAULT_DSN, DEFAULT_TABLE, connect
+from reiz.db.connection import connect
+from reiz.utilities import get_db_settings
 
 
 def start(**db_opts):
@@ -19,8 +20,8 @@ def start(**db_opts):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--dsn", default=DEFAULT_DSN)
-    parser.add_argument("--table", default=DEFAULT_TABLE)
+    parser.add_argument("--dsn", default=get_db_settings()["dsn"])
+    parser.add_argument("--database", default=get_db_settings()["database"])
     options = parser.parse_args()
     start(**vars(options))
 

@@ -8,7 +8,7 @@ from functools import partialmethod
 from pathlib import Path
 from typing import ContextManager, List
 
-from reiz.db.connection import DEFAULT_DSN, DEFAULT_TABLE
+from reiz.db.connection import DEFAULT_DATABASE, DEFAULT_DSN
 
 DEFAULT_CONFIG_PATH = Path("~/.local/reiz.json")
 
@@ -58,7 +58,7 @@ def get_db_settings():
         with open(DEFAULT_CONFIG_PATH) as file:
             return json.load(file)
     else:
-        return {"dsn": DEFAULT_DSN, "table": DEFAULT_TABLE}
+        return {"dsn": DEFAULT_DSN, "database": DEFAULT_DATABASE}
 
 
 class ReizEnum(Enum):

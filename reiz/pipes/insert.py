@@ -9,10 +9,10 @@ from typing import NamedTuple
 
 from edgedb.errors import InternalServerError
 
-from reiz.db.connection import DEFAULT_DSN, DEFAULT_TABLE, connect
+from reiz.db.connection import connect
 from reiz.edgeql import EdgeQLSelect, EdgeQLSelector
 from reiz.serialization.serializer import insert_file
-from reiz.utilities import get_executor, logger, read_config
+from reiz.utilities import get_db_settings, get_executor, logger, read_config
 
 FILE_CACHE = frozenset()
 
@@ -103,8 +103,8 @@ def insert(clean_dir, workers, **db_opts):
 def main():
     parser = ArgumentParser()
     parser.add_argument("clean_dir", type=Path)
-    parser.add_argument("--dsn", default=DEFAULT_DSN)
-    parser.add_argument("--table", default=DEFAULT_TABLE)
+    parser.add_argument("--dsn", default=get_db_settings()["dsn"])
+    parser.add_argument("--database", default=get_db_settings()["database"])
     parser.add_argument("--workers", type=int, default=1)
     options = parser.parse_args()
     with warnings.catch_warnings():

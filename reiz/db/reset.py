@@ -6,7 +6,7 @@ from pathlib import Path
 import edgedb
 from edgedb.errors import InvalidReferenceError
 
-DEF_DSN = "edgedb://edgedb@localhost"
+from reiz.utilities import get_db_settings
 
 
 def drop_all_connection():
@@ -20,18 +20,16 @@ def drop_all_connection():
     )
 
 
-def drop_and_load_db(scheme, database_name, edge_host=DEF_DSN):
+def drop_and_load_db(schema, dsn, database):
     drop_all_connection()
-    with closing(edgedb.connect(edge_host + "/edgedb")) as connection:
+    with closing(edgedb.connect(dsn, database="edgedb")) as connection:
         with suppress(InvalidReferenceError):
-            connection.execute(f"DROP DATABASE {database_name}")
+            connection.execute(f"DROP DATABASE {database}")
         print("Creating the database...")
-        connection.execute(f"CREATE DATABASE {database_name}")
-    with closing(
-        edgedb.connect(edge_host + f"/{database_name}")
-    ) as connection:
-        with open(scheme) as scheme_f:
-            content = scheme_f.read()
+        connection.execute(f"CREATE DATABASE {database}")
+    with closing(edgedb.connect(dsn, database=database)) as connection:
+        with open(schema) as schema_f:
+            content = schema_f.read()
         connection.execute(content)
         connection.execute("POPULATE MIGRATION")
         print("Committing the schema...")
@@ -40,9 +38,9 @@ def drop_and_load_db(scheme, database_name, edge_host=DEF_DSN):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("scheme", type=Path)
-    parser.add_argument("--database_name", default="asttests")
-    parser.add_argument("--edge_host", default=DEF_DSN)
+    parser.add_argument("schema", type=Path)
+    parser.add_argument("--dsn", default=get_db_settings()["dsn"])
+    parser.add_argument("--database", default=get_db_settings()["database"])
     options = parser.parse_args()
     drop_and_load_db(**vars(options))
 
