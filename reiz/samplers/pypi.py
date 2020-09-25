@@ -113,7 +113,7 @@ def download_top_packages(
 ) -> Generator[Path, None, None]:
     directory.mkdir(exist_ok=True)
     if not (directory / "info.json").exists():
-        write_config(directory, [])
+        write_config(directory / "info.json", [])
 
     packages = get_top_packages(days)[limit]
     packages = filter_already_downloaded(directory, packages)
@@ -134,7 +134,7 @@ def download_top_packages(
             directory / "info.json",
             read_config(directory / "info.json") + caches,
         )
-    logging.info("fetched %d projects", len(caches))
+    logger.info("fetched %d projects", len(caches))
 
 
 def main():
