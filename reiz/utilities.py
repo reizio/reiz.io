@@ -10,7 +10,7 @@ from typing import ContextManager, List
 
 from reiz.db.connection import DEFAULT_DATABASE, DEFAULT_DSN
 
-DEFAULT_CONFIG_PATH = Path("~/.local/reiz.json")
+DEFAULT_CONFIG_PATH = Path("~/.local/reiz.json").expanduser()
 
 
 def add_logging_level(name, value):
