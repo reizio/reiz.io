@@ -4,3 +4,4 @@ Flask-Limiter
 redis
 wheel
 gunicorn
+flask-cors

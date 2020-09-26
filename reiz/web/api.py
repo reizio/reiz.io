@@ -5,6 +5,7 @@ from pathlib import Path
 
 import edgedb
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -21,6 +22,8 @@ from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
 from reiz.utilities import get_config_settings, get_db_settings, logger
 
 app = Flask(__name__)
+CORS(app)
+
 extras = {}
 if redis_url := get_config_settings().get("redis"):
     extras["storage_uri"] = redis_url
