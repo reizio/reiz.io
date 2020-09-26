@@ -1,4 +1,6 @@
 edgedb
 flask
 Flask-Limiter
-redis-py
+redis
+wheel
+gunicorn
