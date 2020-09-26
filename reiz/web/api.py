@@ -5,15 +5,40 @@ from pathlib import Path
 
 import edgedb
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from reiz.db.connection import connect
-from reiz.edgeql import EdgeQLSelector, construct
+from reiz.db.schema import protected_name
+from reiz.edgeql import (
+    EdgeQLCall,
+    EdgeQLSelect,
+    EdgeQLSelector,
+    EdgeQLUnion,
+    construct,
+)
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
 from reiz.utilities import get_db_settings, logger
 
 app = Flask(__name__)
+extras = {}
+if redis_url := get_db_settings().get("redis"):
+    extras["RATELIMIT_STORAGE_URL"] = redis_url
+
+limiter = Limiter(app, key_func=get_remote_address, **extras)
+
 DEFAULT_LIMIT = 10
-TOKENS_FILE = Path("~/.reiz/TOKENS_FILE").expanduser()
+
+STAT_NODES = ("Module", "AST", "stmt", "expr")
+STATS_QUERY = construct(
+    EdgeQLSelect(
+        EdgeQLUnion.from_seq(
+            EdgeQLCall("count", [protected_name(node_t, prefix=True)])
+            for node_t in STAT_NODES
+        )
+    ),
+    top_level=True,
+)
 
 
 class LocationNode(ast.AST):
@@ -31,15 +56,6 @@ def validate_keys(*keys):
     for key in keys:
         if key not in request.json.keys():
             return key
-
-
-def verify_token(token):
-    if TOKENS_FILE.exists():
-        tokens = TOKENS_FILE.read_text().splitlines()
-    else:
-        tokens = []
-        logger.warning("Tokens file (%r) doesn't exist!", TOKENS_FILE)
-    return token in tokens
 
 
 def result_fetch_worker(reiz_ql):
@@ -94,8 +110,9 @@ def result_fetch_worker(reiz_ql):
 
 
 @app.route("/query", methods=["POST"])
+@limiter.limit("120 per hour")
 def query():
-    if key := validate_keys("query", "token"):
+    if key := validate_keys("query"):
         return (
             jsonify(
                 {
@@ -107,21 +124,18 @@ def query():
             412,
         )
 
-    if not verify_token(request.json["token"]):
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "results": [],
-                    "exception": "access denied",
-                }
-            ),
-            401,
-        )
-
     reiz_ql = request.json["query"]
     results, ret = result_fetch_worker(reiz_ql)
     return jsonify(results), ret
+
+
+@app.route("/stats", methods=["GET"])
+def stats():
+    with connect(**get_db_settings()) as conn:
+        logger.info("EdgeQL query: %r", STATS_QUERY)
+        stats = tuple(conn.query(STATS_QUERY))
+
+    return jsonify(dict(zip(STAT_NODES, stats))), 200
 
 
 if __name__ == "__main__":

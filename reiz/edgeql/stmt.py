@@ -45,6 +45,25 @@ class EdgeQLSelector(EdgeQLComponent):
 
 
 @dataclass(unsafe_hash=True)
+class EdgeQLUnion(EdgeQLComponent):
+    left: EdgeQLObject
+    right: EdgeQLObject
+
+    def construct(self):
+        return construct(self.left) + " UNION " + construct(self.right)
+
+    @classmethod
+    def from_seq(cls, items):
+        union = None
+        for item in items:
+            if union is None:
+                union = item
+            else:
+                union = cls(union, item)
+        return union
+
+
+@dataclass(unsafe_hash=True)
 class EdgeQLFilter(EdgeQLComponent):
     key: EdgeQLExpression
     value: EdgeQLObject
