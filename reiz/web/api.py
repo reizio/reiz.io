@@ -23,7 +23,7 @@ from reiz.utilities import get_db_settings, logger
 app = Flask(__name__)
 extras = {}
 if redis_url := get_db_settings().get("redis"):
-    extras["RATELIMIT_STORAGE_URL"] = redis_url
+    extras["storage_uri"] = redis_url
 
 limiter = Limiter(app, key_func=get_remote_address, **extras)
 
