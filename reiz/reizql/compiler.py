@@ -92,9 +92,16 @@ def generate_typechecked_query(filters, base):
         elif isinstance(query.value, EdgeQLSelect):
             model = protected_name(query.value.name, prefix=True)
             verifier = EdgeQLVerify(key, EdgeQLVerifyOperator.IS, model)
-            current_query = generate_typechecked_query(
-                query.value.filters, verifier
-            )
+            if query.value.filters:
+                current_query = generate_typechecked_query(
+                    query.value.filters, verifier
+                )
+            else:
+                current_query = EdgeQLFilter(
+                    EdgeQLAttribute(base, query.key.name),
+                    model,
+                    EdgeQLComparisonOperator.IDENTICAL,
+                )
         else:
             raise ReizQLSyntaxError("Unsupported syntax")
 

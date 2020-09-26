@@ -125,7 +125,10 @@ def parse_set(node):
 
 
 def parse_query(source):
-    tree = ast.parse(source)
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        raise ReizQLSyntaxError(exc.args[0])
     ensure(len(tree.body) == 1, tree)
     ensure(isinstance(tree.body[0], ast.Expr), tree.body[0])
     ensure(isinstance(tree.body[0].value, ast.Call), tree.body[0].value)

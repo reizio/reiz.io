@@ -1,5 +1,7 @@
 import ast
+import threading
 import tokenize
+from pathlib import Path
 
 import edgedb
 from flask import Flask, jsonify, request
@@ -11,6 +13,7 @@ from reiz.utilities import get_db_settings, logger
 
 app = Flask(__name__)
 DEFAULT_LIMIT = 10
+TOKENS_FILE = Path("~/.reiz/TOKENS_FILE").expanduser()
 
 
 class LocationNode(ast.AST):
@@ -30,19 +33,27 @@ def validate_keys(*keys):
             return key
 
 
-@app.route("/query", methods=["POST"])
-def query():
-    if key := validate_keys("query"):
-        return jsonify({"error": f"Missing key {key}"}), 412
+def verify_token(token):
+    if TOKENS_FILE.exists():
+        tokens = TOKENS_FILE.read_text().splitlines()
+    else:
+        tokens = []
+        logger.warning("Tokens file (%r) doesn't exist!", TOKENS_FILE)
+    return token in tokens
 
-    reiz_ql = request.json["query"]
+
+def result_fetch_worker(reiz_ql):
     try:
         tree = parse_query(reiz_ql)
     except ReizQLSyntaxError as syntax_err:
-        error = {"error": "Syntax error", "message": syntax_err.message}
+        error = {
+            "status": "error",
+            "results": [],
+            "exception": syntax_err.message,
+        }
         if syntax_err.position:
             error.update(syntax_err.position)
-        return jsonify(error), 422
+        return error, 422
     else:
         logger.info("ReizQL Tree: %r", tree)
 
@@ -64,7 +75,7 @@ def query():
         try:
             query_set = conn.query(query)
         except edgedb.errors.InvalidReferenceError as exc:
-            return jsonify({"error": exc.args[0]})
+            return {"status": "error", "results": [], "exception": exc.args[0]}
 
         for result in query_set:
             results.append(
@@ -79,7 +90,38 @@ def query():
                     "filename": result._module.filename,
                 }
             )
-    return jsonify(results), 200
+    return {"status": "success", "results": results, "exception": None}, 200
+
+
+@app.route("/query", methods=["POST"])
+def query():
+    if key := validate_keys("query", "token"):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "results": [],
+                    "exception": f"Missing key {key}",
+                }
+            ),
+            412,
+        )
+
+    if not verify_token(request.json["token"]):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "results": [],
+                    "exception": "access denied",
+                }
+            ),
+            401,
+        )
+
+    reiz_ql = request.json["query"]
+    results, ret = result_fetch_worker(reiz_ql)
+    return jsonify(results), ret
 
 
 if __name__ == "__main__":

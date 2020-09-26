@@ -85,7 +85,9 @@ def make_filter(**kwargs):
 
 
 def unpack_filters(filters, operator=None):
-    if isinstance(filters, EdgeQLFilter):
+    if filters is None:
+        yield from ()
+    elif isinstance(filters, EdgeQLFilter):
         yield filters, operator
     else:
         yield from unpack_filters(filters.left, filters.operator)

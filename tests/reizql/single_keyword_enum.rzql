@@ -1,3 +1,0 @@
-Name(ctx=Store())
-# GENERATED-CODE
-SELECT ast::Name FILTER .ctx = <ast::expr_context>'Store'
