@@ -53,10 +53,17 @@ def write_config(config: Path, data: List[str]) -> None:
         json.dump(data, config)
 
 
-def get_db_settings():
+def get_config_settings():
     if DEFAULT_CONFIG_PATH.exists():
         with open(DEFAULT_CONFIG_PATH) as file:
             return json.load(file)
+    else:
+        return {}
+
+
+def get_db_settings():
+    if config := get_config_settings():
+        return config["db"]
     else:
         return {"dsn": DEFAULT_DSN, "database": DEFAULT_DATABASE}
 

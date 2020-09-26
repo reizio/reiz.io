@@ -18,11 +18,11 @@ from reiz.edgeql import (
     construct,
 )
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
-from reiz.utilities import get_db_settings, logger
+from reiz.utilities import get_config_settings, get_db_settings, logger
 
 app = Flask(__name__)
 extras = {}
-if redis_url := get_db_settings().get("redis"):
+if redis_url := get_config_settings().get("redis"):
     extras["storage_uri"] = redis_url
 
 limiter = Limiter(app, key_func=get_remote_address, **extras)
