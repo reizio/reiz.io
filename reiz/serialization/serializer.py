@@ -26,7 +26,12 @@ from reiz.edgeql import (
     construct,
     make_filter,
 )
-from reiz.serialization.transformers import QLAst, infer_base, iter_attributes
+from reiz.serialization.transformers import (
+    QLAst,
+    Sentinel,
+    infer_base,
+    iter_attributes,
+)
 from reiz.utilities import logger
 
 
