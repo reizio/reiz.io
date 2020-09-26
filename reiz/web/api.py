@@ -94,18 +94,26 @@ def result_fetch_worker(reiz_ql):
         try:
             query_set = conn.query(query)
         except edgedb.errors.InvalidReferenceError as exc:
-            return {"status": "error", "results": [], "exception": exc.args[0]}
+            return {
+                "status": "error",
+                "results": [],
+                "exception": exc.args[0],
+            }, 412
 
         for result in query_set:
+            try:
+                source = fetch(
+                    result._module.filename,
+                    lineno=result.lineno,
+                    col_offset=result.col_offset,
+                    end_lineno=result.end_lineno,
+                    end_col_offset=result.end_col_offset,
+                )
+            except:
+                source = None
             results.append(
                 {
-                    "source": fetch(
-                        result._module.filename,
-                        lineno=result.lineno,
-                        col_offset=result.col_offset,
-                        end_lineno=result.end_lineno,
-                        end_col_offset=result.end_col_offset,
-                    ),
+                    "source": source,
                     "filename": result._module.filename,
                 }
             )
