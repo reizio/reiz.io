@@ -1,0 +1,6 @@
+=> Features
+ -> Bound variables (`~var`)
+
+=> Issues
+ -> `ClassDef(decorator_list=[Name('dataclass' | 'total_ordering')], body=[AnnAssign(targets=[Name()]), AnnAssign()])`
+ -> `ClassDef(body=[FunctionDef(decorator_list=[Name('classmethod')])])`
