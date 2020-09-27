@@ -30,6 +30,13 @@ class ReizQLMatch(ReizQLExpression):
 
 
 @dataclass(unsafe_hash=True)
+class ReizQLBuiltin(ReizQLExpression):
+    name: str
+    args: List[ReizQLExpression]
+    keywords: Dict[str, ReizQLExpression]
+
+
+@dataclass(unsafe_hash=True)
 class ReizQLMatchEnum(ReizQLExpression):
     base: str
     name: str

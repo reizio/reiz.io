@@ -3,6 +3,7 @@ import functools
 
 from reiz.db.schema import ATOMIC_TYPES, ENUM_TYPES
 from reiz.reizql.nodes import (
+    ReizQLBuiltin,
     ReizQLConstant,
     ReizQLList,
     ReizQLLogicalOperation,
@@ -11,6 +12,8 @@ from reiz.reizql.nodes import (
     ReizQLMatchEnum,
     ReizQLSet,
 )
+
+BUILTIN_FUNCTIONS = ("ALL", "ANY")
 
 
 class ReizQLSyntaxError(Exception):
@@ -47,6 +50,10 @@ def ensure(condition, node, message="Invalid syntax"):
         raise ReizQLSyntaxError.from_node(node, message)
 
 
+def is_valid_matcher(name):
+    return hasattr(ast, name) or name in BUILTIN_FUNCTIONS
+
+
 @functools.singledispatch
 def parse(node):
     raise ReizQLSyntaxError.from_node(node, "Invalid syntax")
@@ -57,7 +64,14 @@ def parse_call(node):
     ensure(isinstance(node.func, ast.Name), node)
 
     name = node.func.id
-    ensure(hasattr(ast, node.func.id), node, f"Unknown matcher: {name!r}")
+    ensure(is_valid_matcher(node.func.id), node, f"Unknown matcher: {name!r}")
+
+    if name in BUILTIN_FUNCTIONS:
+        return ReizQLBuiltin(
+            name,
+            [parse(arg) for arg in node.args],
+            {keyword: parse(keyword) for keyword in node.keywords},
+        )
 
     origin = getattr(ast, name)
     if issubclass(origin, ENUM_TYPES):

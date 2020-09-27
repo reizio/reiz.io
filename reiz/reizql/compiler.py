@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from reiz.db.schema import protected_name
 from reiz.edgeql import *
 from reiz.reizql.nodes import (
+    ReizQLBuiltin,
     ReizQLConstant,
     ReizQLList,
     ReizQLLogicalOperation,
@@ -13,6 +14,7 @@ from reiz.reizql.nodes import (
     ReizQLMatchEnum,
     ReizQLSet,
 )
+from reiz.reizql.parser import ReizQLSyntaxError
 
 __DEFAULT_FOR_TARGET = "__KEY"
 
@@ -108,6 +110,34 @@ def generate_typechecked_query(filters, base):
         base_query = merge_filters(base_query, current_query, operator)
 
     return base_query
+
+
+def convert_any_all(node, state):
+    if len(node.args) != 1 or node.keywords:
+        raise ReizQLSyntaxError(
+            f"Parameter mismatch for built-in function: {node.name!r}"
+        )
+
+    check = compile_edgeql(*node.args, state)
+    if check.filters:
+        operator = EdgeQLComparisonOperator.EQUALS
+    else:
+        check = protected_name(check.name, prefix=True)
+        operator = EdgeQLComparisonOperator.IDENTICAL
+
+    return EdgeQLFilter(
+        EdgeQLCall(
+            node.name.lower(),
+            [EdgeQLFilter(EdgeQLFilterKey(state.pointer), check, operator)],
+        ),
+        EdgeQLPreparedQuery("True"),
+    )
+
+
+@compile_edgeql.register(ReizQLBuiltin)
+def convert_builtin(node, state):
+    if node.name in ("ANY", "ALL"):
+        return convert_any_all(node, state)
 
 
 @compile_edgeql.register(ReizQLList)
