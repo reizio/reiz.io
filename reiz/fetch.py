@@ -46,25 +46,31 @@ def fetch(filename, **loc_data):
     return ast.get_source_segment(source, loc_node)
 
 
-def run_query(reiz_ql, limit=DEFAULT_LIMIT):
+def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
     tree = parse_query(reiz_ql)
     logger.info("ReizQL Tree: %r", tree)
 
     selection = compile_edgeql(tree)
-    selection.limit = limit
-    selection.selections = [
-        EdgeQLSelector("lineno"),
-        EdgeQLSelector("col_offset"),
-        EdgeQLSelector("end_lineno"),
-        EdgeQLSelector("end_col_offset"),
-        EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
-    ]
+    if stats:
+        selection = EdgeQLSelect(EdgeQLCall("count", [selection]))
+    else:
+        selection.limit = limit
+        selection.selections = [
+            EdgeQLSelector("lineno"),
+            EdgeQLSelector("col_offset"),
+            EdgeQLSelector("end_lineno"),
+            EdgeQLSelector("end_col_offset"),
+            EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
+        ]
 
     query = construct(selection, top_level=True)
     logger.info("EdgeQL query: %r", query)
 
     results = []
     with connect(**get_db_settings()) as conn:
+        if stats:
+            return conn.query_one(query)
+
         query_set = conn.query(query)
 
         for result in query_set:

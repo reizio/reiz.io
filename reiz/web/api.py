@@ -49,7 +49,7 @@ def query():
 
     reiz_ql = request.json["query"]
     try:
-        results = run_query(reiz_ql)
+        results = run_query(reiz_ql, request.json.get("stats", False))
     except ReizQLSyntaxError as syntax_err:
         error = {
             "status": "error",
