@@ -10,6 +10,7 @@ from reiz.reizql.nodes import (
     ReizQLLogicOperator,
     ReizQLMatch,
     ReizQLMatchEnum,
+    ReizQLNot,
     ReizQLSet,
 )
 
@@ -136,6 +137,14 @@ def parse_list(node):
 @parse.register(ast.Set)
 def parse_set(node):
     return ReizQLSet([parse(item) for item in node.elts])
+
+
+@parse.register(ast.UnaryOp)
+def parse_unary(node):
+    if isinstance(node.op, ast.Not):
+        return ReizQLNot(parse(node.operand))
+    else:
+        raise ReizQLSyntaxError.from_node(node, "unknown unary operator")
 
 
 def parse_query(source):

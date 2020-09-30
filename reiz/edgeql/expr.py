@@ -37,9 +37,14 @@ class EdgeQLComparisonOperator(ReizEnum):
     CONTAINS = "IN"
     IDENTICAL = "IS"
     NOT_EQUALS = "!="
+    NOT_CONTAINS = "NOT IN"
+    NOT_IDENTICAL = "IS NOT"
 
     def construct(self):
         return self.value
+
+    def negate(self):
+        return getattr(self, f"NOT_{self.name}", None)
 
 
 @dataclass(unsafe_hash=True)
@@ -129,3 +134,11 @@ class EdgeQLReference(EdgeQLExpression):
 
     def construct(self):
         return construct(EdgeQLCast("uuid", repr(str(self.value.id))))
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLNot(EdgeQLExpression):
+    value: EdgeQLObject
+
+    def construct(self):
+        return "not " + construct(self.value)

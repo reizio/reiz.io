@@ -100,6 +100,12 @@ It is on our task list to optimize, and probably will come with Alpha 2.
 ```
 or_filter := filter "|" filter
 ```
+### Negatations
+A simple unary `not` will be able to flip your query to 'not to' match,
+like `Tuple(ALL(not Constant()))`.
+```
+negated := "not" filter
+```
 
 
 ## Example Queries

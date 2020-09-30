@@ -12,6 +12,7 @@ from reiz.reizql.nodes import (
     ReizQLLogicOperator,
     ReizQLMatch,
     ReizQLMatchEnum,
+    ReizQLNot,
     ReizQLSet,
 )
 from reiz.reizql.parser import ReizQLSyntaxError
@@ -119,11 +120,22 @@ def convert_any_all(node, state):
         )
 
     check = compile_edgeql(*node.args, state)
-    if check.filters:
+    negated = isinstance(check, EdgeQLNot)
+    if negated:
+        check = check.value
+
+    if isinstance(check, EdgeQLSelect) and check.filters:
         operator = EdgeQLComparisonOperator.EQUALS
-    else:
+    elif isinstance(check, EdgeQLSelect) and not check.filters:
         check = protected_name(check.name, prefix=True)
         operator = EdgeQLComparisonOperator.IDENTICAL
+    else:
+        raise ReizQLSyntaxError(
+            "Unsupported operation passed into built-in function"
+        )
+
+    if negated:
+        operator = operator.negate()
 
     return EdgeQLFilter(
         EdgeQLCall(
@@ -138,6 +150,11 @@ def convert_any_all(node, state):
 def convert_builtin(node, state):
     if node.name in ("ANY", "ALL"):
         return convert_any_all(node, state)
+
+
+@compile_edgeql.register(ReizQLNot)
+def convert_negatation(node, state):
+    return EdgeQLNot(compile_edgeql(node.value, state))
 
 
 @compile_edgeql.register(ReizQLList)

@@ -62,3 +62,8 @@ class ReizQLSet(ReizQLExpression):
 @dataclass(unsafe_hash=True)
 class ReizQLConstant(ReizQLExpression):
     value: Union[str, int]
+
+
+@dataclass(unsafe_hash=True)
+class ReizQLNot(ReizQLExpression):
+    value: ReizQLExpression
