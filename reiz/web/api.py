@@ -1,6 +1,9 @@
+import atexit
+import json
 import traceback
 
 import edgedb
+import redis
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -10,20 +13,34 @@ from reiz.fetch import get_stats, run_query
 from reiz.reizql import ReizQLSyntaxError
 from reiz.utilities import get_config_settings, logger
 
+CACHING = None
+
 
 def get_app():
+    global CACHING
     app = Flask(__name__)
     CORS(app)
 
     extras = {}
     if redis_url := get_config_settings().get("redis"):
         extras["storage_uri"] = redis_url
+        CACHING = redis.from_url(redis_url)
+        atexit.register(CACHING.close)
 
     limiter = Limiter(app, key_func=get_remote_address, **extras)
     return app, limiter
 
 
 app, limiter = get_app()
+
+
+def run_cached_query(reiz_ql):
+    if results := CACHING.get(reiz_ql):
+        return json.loads(results)
+    else:
+        results = run_query(reiz_ql)
+        CACHING.set(reiz_ql, json.dumps(results))
+        return results
 
 
 def validate_keys(*keys):
@@ -33,7 +50,6 @@ def validate_keys(*keys):
 
 
 @app.route("/query", methods=["POST"])
-@limiter.limit("240 per hour")
 def query():
     if key := validate_keys("query"):
         return (
@@ -49,7 +65,10 @@ def query():
 
     reiz_ql = request.json["query"]
     try:
-        results = run_query(reiz_ql, request.json.get("stats", False))
+        if stats := request.json.get("stats", False) or not CACHING:
+            results = run_query(reiz_ql, stats=stats)
+        else:
+            results = run_cached_query(reiz_ql)
     except ReizQLSyntaxError as syntax_err:
         error = {
             "status": "error",

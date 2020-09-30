@@ -198,4 +198,11 @@ def convert_list(node, state):
 
 @compile_edgeql.register(ReizQLConstant)
 def convert_atomic(node, state):
-    return EdgeQLPreparedQuery(str(node.value))
+    if (
+        state.name == "Dict"
+        and state.pointer == "keys"
+        and str(node.value) == repr(str(None))
+    ):
+        return compile_edgeql(ReizQLMatch("Sentinel"))
+    else:
+        return EdgeQLPreparedQuery(str(node.value))

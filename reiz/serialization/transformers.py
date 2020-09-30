@@ -30,6 +30,7 @@ class Sentinel(ast.expr):
     end_col_offset = 0
 
 
+ast.Sentinel = Sentinel
 alter_ast(ast.Module, "_fields", "filename")
 alter_ast(ast.slice, "_attributes", "sentinel")
 for sum_type in MODULE_ANNOTATED_TYPES:

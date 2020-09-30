@@ -65,7 +65,7 @@ def worker(query, api):
         logger.error("Query %r failed with %s!", exc.query, exc.reason)
         return False
     else:
-        logger.info("Query succeed!")
+        logger.info("Query succeed with %d matches!", matches)
         return True
 
 
