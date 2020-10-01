@@ -23,7 +23,7 @@ from reiz.edgeql import (
     EdgeQLSet,
     EdgeQLUpdate,
     EdgeQLVariable,
-    construct,
+    as_edgeql,
     make_filter,
 )
 from reiz.serialization.transformers import (
@@ -104,7 +104,7 @@ def insert(connection, ql_state, node):
         if value is None:
             continue
         insertions[field] = serialize(value, ql_state, connection)
-    query = construct(EdgeQLInsert(node_type, insertions), top_level=True)
+    query = as_edgeql(EdgeQLInsert(node_type, insertions))
     logger.trace("Running query: %r", query)
     return connection.query_one(query)
 
@@ -135,13 +135,12 @@ def insert_file(connection, file):
             operator=EdgeQLComparisonOperator.CONTAINS,
         )
         for base in MODULE_ANNOTATED_TYPES:
-            update = construct(
+            update = as_edgeql(
                 EdgeQLUpdate(
                     base.__name__,
                     filters=update_filter,
                     assigns={"_module": module_select},
                 ),
-                top_level=True,
             )
             logger.trace("Running post-insert query: %r", update)
             connection.query(update, ids=ql_state.reference_pool)

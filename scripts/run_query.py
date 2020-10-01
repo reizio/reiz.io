@@ -3,7 +3,7 @@ import ast
 from argparse import ArgumentParser, FileType
 
 from reiz.db.connection import connect
-from reiz.edgeql import EdgeQLSelector, construct
+from reiz.edgeql import EdgeQLSelector, as_edgeql
 from reiz.reizql import compile_edgeql, parse_query
 from reiz.utilities import get_db_settings, logger
 
@@ -34,7 +34,7 @@ def query(source, limit=10, show_source=True, **db_opts):
             EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
         ]
 
-        query = construct(selection, top_level=True)
+        query = as_edgeql(selection)
         logger.info("EdgeQL query: %r", query)
 
         for result in conn.query(query):

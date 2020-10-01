@@ -44,7 +44,10 @@ class EdgeQLComparisonOperator(ReizEnum):
         return self.value
 
     def negate(self):
-        return getattr(self, f"NOT_{self.name}", None)
+        if self.name.startswith("NOT_"):
+            return getattr(self, self.name[4:])
+        else:
+            return getattr(self, f"NOT_{self.name}")
 
 
 @dataclass(unsafe_hash=True)

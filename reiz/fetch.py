@@ -9,7 +9,7 @@ from reiz.edgeql import (
     EdgeQLSelect,
     EdgeQLSelector,
     EdgeQLUnion,
-    construct,
+    as_edgeql,
 )
 from reiz.reizql import compile_edgeql, parse_query
 from reiz.utilities import get_db_settings, logger
@@ -23,14 +23,13 @@ class LocationNode(ast.AST):
 
 @lru_cache(8)
 def get_stats(nodes=("Module", "AST", "stmt", "expr")):
-    query = construct(
+    query = as_edgeql(
         EdgeQLSelect(
             EdgeQLUnion.from_seq(
                 EdgeQLCall("count", [protected_name(node, prefix=True)])
                 for node in nodes
             )
         ),
-        top_level=True,
     )
 
     with connect(**get_db_settings()) as conn:
@@ -63,7 +62,7 @@ def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
             EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
         ]
 
-    query = construct(selection, top_level=True)
+    query = as_edgeql(selection)
     logger.info("EdgeQL query: %r", query)
 
     results = []

@@ -163,7 +163,7 @@ def convert_list(node, state):
         EdgeQLCall("count", [EdgeQLFilterKey(state.pointer)]), len(node.items)
     )
     if len(node.items) == 0:
-        return quantity_verifier
+        return object_verifier
 
     assignments = {}
     select_filters = None
