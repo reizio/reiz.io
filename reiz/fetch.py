@@ -15,6 +15,7 @@ from reiz.reizql import compile_edgeql, parse_query
 from reiz.utilities import get_db_settings, logger
 
 DEFAULT_LIMIT = 10
+DEFAULT_NODES = ("Module", "AST", "stmt", "expr")
 
 
 class LocationNode(ast.AST):
@@ -22,7 +23,7 @@ class LocationNode(ast.AST):
 
 
 @lru_cache(8)
-def get_stats(nodes=("Module", "AST", "stmt", "expr")):
+def get_stats(nodes=DEFAULT_NODES):
     query = as_edgeql(
         EdgeQLSelect(
             EdgeQLUnion.from_seq(

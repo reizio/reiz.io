@@ -111,6 +111,7 @@ def query():
 
 
 @app.route("/stats", methods=["GET"])
+@limiter.limit("4 per hour")
 def stats():
     return jsonify(get_stats()), 200
 

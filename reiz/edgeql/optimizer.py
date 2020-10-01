@@ -14,8 +14,11 @@ class OptimizerState:
 
 
 def visit(node, state):
-    node = generic_visit(node, state)
-    return optimize_edgeql(node, state)
+    if isinstance(node, EdgeQLObject):
+        node = generic_visit(node, state)
+        return optimize_edgeql(node, state)
+    else:
+        return node
 
 
 def generic_visit(node, state):
