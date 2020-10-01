@@ -50,6 +50,7 @@ def validate_keys(*keys):
 
 
 @app.route("/query", methods=["POST"])
+@limiter.limit("240 per hour")
 def query():
     if key := validate_keys("query"):
         return (
