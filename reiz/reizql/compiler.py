@@ -7,6 +7,7 @@ from reiz.edgeql import *
 from reiz.reizql.nodes import (
     ReizQLBuiltin,
     ReizQLConstant,
+    ReizQLIgnore,
     ReizQLList,
     ReizQLLogicalOperation,
     ReizQLLogicOperator,
@@ -38,16 +39,17 @@ def convert_match(node, state=None):
     state = SelectState(node.name, None)
     for key, value in node.filters.items():
         state.pointer = protected_name(key, prefix=False)
+        if value is ReizQLIgnore:
+            continue
+
         conversion = compile_edgeql(value, state)
+
         if not isinstance(conversion, EdgeQLFilterType):
             conversion = EdgeQLFilter(
                 EdgeQLFilterKey(state.pointer), conversion
             )
 
-        if query is None:
-            query = conversion
-        else:
-            query = EdgeQLFilterChain(query, conversion)
+        query = merge_filters(query, conversion)
 
     params = {"filters": query}
     if state.assignments:
@@ -162,13 +164,21 @@ def convert_list(node, state):
     object_verifier = EdgeQLFilter(
         EdgeQLCall("count", [EdgeQLFilterKey(state.pointer)]), len(node.items)
     )
-    if len(node.items) == 0:
+    if len(node.items) == 0 or all(
+        item is ReizQLIgnore for item in node.items
+    ):
         return object_verifier
 
     assignments = {}
     select_filters = None
     for index, item in enumerate(node.items):
-        assert isinstance(item, ReizQLMatch)
+        if item is ReizQLIgnore:
+            continue
+        elif not isinstance(item, ReizQLMatch):
+            raise ReizQLSyntaxError(
+                "A list may only contain matchers, not atoms"
+            )
+
         selection = EdgeQLSelect(
             EdgeQLFilterKey(state.pointer),
             ordered=EdgeQLProperty("index"),

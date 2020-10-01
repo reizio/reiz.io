@@ -18,6 +18,11 @@ class ReizQLExpression(ReizQLObject):
     ...
 
 
+@object.__new__
+class ReizQLIgnore(ReizQLExpression):
+    ...
+
+
 @ReizQLObject.register
 class ReizQLLogicOperator(ReizEnum):
     OR = auto()

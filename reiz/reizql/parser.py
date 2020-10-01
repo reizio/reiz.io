@@ -5,6 +5,7 @@ from reiz.db.schema import ATOMIC_TYPES, ENUM_TYPES
 from reiz.reizql.nodes import (
     ReizQLBuiltin,
     ReizQLConstant,
+    ReizQLIgnore,
     ReizQLList,
     ReizQLLogicalOperation,
     ReizQLLogicOperator,
@@ -117,7 +118,9 @@ def parse_binop(node):
 
 @parse.register(ast.Constant)
 def parse_constant(node):
-    if type(node.value) is int:
+    if node.value is Ellipsis:
+        return ReizQLIgnore
+    elif type(node.value) is int:
         value = repr(node.value)
     else:
         value = repr(str(node.value))
@@ -126,11 +129,6 @@ def parse_constant(node):
 
 @parse.register(ast.List)
 def parse_list(node):
-    ensure(
-        all(isinstance(item, ast.Call) for item in node.elts),
-        node,
-        "A list may only contain matchers, not atoms",
-    )
     return ReizQLList([parse(item) for item in node.elts])
 
 

@@ -89,7 +89,20 @@ Return()}`), or they might be ATOMs (such as `Constant(1)` or
 filter := matcher
         | '[' filter* ']'
         | '{' filter* ']'
+        | ignore
+        | or_filter
+        | negated
         | ATOM
+```
+
+### The Ignore
+The Ignore is a special constant (`...`) that represents any value.
+For an example, if you want to match a function where there is 3
+elements but all you care is whether the last element is a return
+or not, you can basically query this `FunctionDef(body=[..., ..., Return()])`.
+
+```
+ignore := '...'
 ```
 
 ### Boolean Logic
@@ -100,13 +113,13 @@ It is on our task list to optimize, and probably will come with Alpha 2.
 ```
 or_filter := filter "|" filter
 ```
-### Negatations
+
+### Negativity
 A simple unary `not` will be able to flip your query to 'not to' match,
 like `Tuple(ALL(not Constant()))`.
 ```
 negated := "not" filter
 ```
-
 
 ## Example Queries
 Match all function definition where there is a `@classmethod` or a `@staticmethod`
