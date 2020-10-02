@@ -74,3 +74,11 @@ class ReizEnum(Enum):
 
     def __repr__(self):
         return str(self)
+
+
+def normalize(data):
+    for key, value in data.copy().items():
+        if isinstance(value, ReizEnum):
+            data[key] = repr(value)
+
+    return data
