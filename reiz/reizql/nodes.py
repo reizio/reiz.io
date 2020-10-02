@@ -19,6 +19,7 @@ class ReizQLExpression(ReizQLObject):
 
 
 @object.__new__
+@dataclass(unsafe_hash=True)
 class ReizQLIgnore(ReizQLExpression):
     ...
 

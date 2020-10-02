@@ -1,6 +1,7 @@
 import atexit
 import json
 import traceback
+from dataclasses import asdict
 
 import edgedb
 import redis
@@ -9,9 +10,10 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+from reiz.edgeql import as_edgeql
 from reiz.fetch import get_stats, run_query
-from reiz.reizql import ReizQLSyntaxError
-from reiz.utilities import get_config_settings, logger
+from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
+from reiz.utilities import get_config_settings, logger, normalize
 
 CACHING = None
 
@@ -114,6 +116,36 @@ def query():
 @limiter.limit("4 per hour")
 def stats():
     return jsonify(get_stats()), 200
+
+
+@app.route("/analyze", methods=["POST"])
+@limiter.limit("240 per hour")
+def analyze():
+    if key := validate_keys("query"):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "results": [],
+                    "exception": f"Missing key {key}",
+                }
+            ),
+            412,
+        )
+
+    results = dict.fromkeys(("exception", "reiz_ql", "edge_ql"))
+    try:
+        reiz_ql = parse_query(request.json["query"])
+        results["reiz_ql"] = normalize(asdict(reiz_ql))
+        results["edge_ql"] = as_edgeql(compile_edgeql(reiz_ql))
+    except ReizQLSyntaxError as syntax_err:
+        results["status"] = "error"
+        results["exception"] = syntax_err.message
+        results.update(syntax_err.position)
+    else:
+        results["status"] = "success"
+
+    return jsonify(results), 200
 
 
 if __name__ == "__main__":
