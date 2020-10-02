@@ -47,9 +47,12 @@ class ReizQLSyntaxError(Exception):
         )
 
 
-def ensure(condition, node, message="Invalid syntax"):
+def ensure(condition, node=None, message="Invalid syntax"):
     if not condition:
-        raise ReizQLSyntaxError.from_node(node, message)
+        if node is None:
+            raise ReizQLSyntaxError(message)
+        else:
+            raise ReizQLSyntaxError.from_node(node, message)
 
 
 def is_valid_matcher(name):
@@ -150,7 +153,7 @@ def parse_query(source):
         tree = ast.parse(source)
     except SyntaxError as exc:
         raise ReizQLSyntaxError(exc.args[0])
-    ensure(len(tree.body) == 1, tree)
+    ensure(len(tree.body) == 1)
     ensure(isinstance(tree.body[0], ast.Expr), tree.body[0])
     ensure(isinstance(tree.body[0].value, ast.Call), tree.body[0].value)
     return parse(tree.body[0].value)
