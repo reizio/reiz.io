@@ -24,6 +24,7 @@ __DEFAULT_FOR_TARGET = "__KEY"
 @dataclass(unsafe_hash=True)
 class SelectState:
     name: str
+    depth: int = 0
     pointer: Optional[str] = None
     assignments: Dict[str, EdgeQLObject] = field(default_factory=dict)
 
@@ -36,7 +37,7 @@ def compile_edgeql(obj, state):
 @compile_edgeql.register(ReizQLMatch)
 def convert_match(node, state=None):
     query = None
-    state = SelectState(node.name, None)
+    state = SelectState(node.name)
     for key, value in node.filters.items():
         state.pointer = protected_name(key, prefix=False)
         if value is ReizQLIgnore:
@@ -88,11 +89,26 @@ def convert_set(node, state):
 def generate_typechecked_query(filters, base):
     base_query = None
     for query, operator in unpack_filters(filters):
-        assert isinstance(query.key, EdgeQLFilterKey)
-        key = EdgeQLAttribute(base, query.key.name)
-
+        rec_list = False
         current_query = None
-        if isinstance(query.value, EdgeQLPreparedQuery):
+        if isinstance(query.key, EdgeQLCall) and isinstance(
+            query.key.args[0], EdgeQLFilterKey
+        ):
+            name = query.key.args[0].name
+            rec_list = True
+        elif isinstance(query.key, EdgeQLFilterKey):
+            name = query.key.name
+        else:
+            raise ReizQLSyntaxError(
+                f"Unknown matcher type for list expression: {type(query).__name__}"
+            )
+
+        key = EdgeQLAttribute(base, name)
+
+        if rec_list:
+            query.key.args[0] = key
+            current_query = query
+        elif isinstance(query.value, EdgeQLPreparedQuery):
             current_query = replace(query, key=key)
         elif isinstance(query.value, EdgeQLSelect):
             model = protected_name(query.value.name, prefix=True)
@@ -198,17 +214,19 @@ def convert_list(node, state):
                 ),
             )
         else:
-            assignments[f"__item_{index}"] = EdgeQLVerify(
+            name = f"__item_{index}_{state.depth}"
+            assignments[name] = EdgeQLVerify(
                 selection,
                 EdgeQLVerifyOperator.IS,
                 protected_name(item.name, prefix=True),
             )
             select_filters = merge_filters(
                 select_filters,
-                generate_typechecked_query(filters, f"__item_{index}"),
+                generate_typechecked_query(filters, name),
             )
 
     if assignments:
+        state.depth += 1
         with_block = EdgeQLWithBlock(assignments)
     else:
         with_block = None
