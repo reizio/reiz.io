@@ -179,6 +179,11 @@ class EdgeQLSelect(EdgeQLStatement):
     selections: Sequence[EdgeQLSelector] = field(default_factory=list)
     with_block: Optional[EdgeQLWithBlock] = None
 
+    def is_bare(self):
+        return self == self.__class__(name=self.name) and isinstance(
+            self.name, str
+        )
+
     def construct(self):
         if self.with_block:
             query = construct(self.with_block, top_level=True) + " SELECT"

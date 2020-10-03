@@ -89,3 +89,22 @@ def optimize_filter(node, state):
             )
 
     return node
+
+
+# @optimize_edgeql.register(EdgeQLSelect)
+def optimize_select(node, state=None):
+    node = generic_visit(node, state)
+
+    filters = None
+    for query, operator in unpack_filters(node.filters):
+        if isinstance(query.key, EdgeQLFilterKey) and isinstance(
+            query.value, EdgeQLSelect
+        ):
+            query = dataclasses.replace(
+                query,
+                value=protected_name(query.value.name, prefix=True),
+                operator=EdgeQLComparisonOperator.IDENTICAL,
+            )
+        filters = merge_filters(filters, query, operator)
+    node = dataclasses.replace(node, filters=filters)
+    return node
