@@ -106,6 +106,8 @@ def make_filter(**kwargs):
 def unpack_filters(filters, operator=None):
     if filters is None:
         yield from ()
+    elif isinstance(filters, EdgeQLSelect):
+        yield filters, operator
     elif isinstance(filters, EdgeQLFilter):
         yield filters, operator
     else:
