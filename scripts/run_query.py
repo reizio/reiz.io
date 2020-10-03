@@ -1,60 +1,9 @@
 #!/usr/bin/env python
 import ast
 from argparse import ArgumentParser, FileType
+from pprint import pprint
 
-from reiz.db.connection import connect
-from reiz.edgeql import EdgeQLSelector, as_edgeql
-from reiz.reizql import compile_edgeql, parse_query
-from reiz.utilities import get_db_settings, logger
-
-
-class LocationNode(ast.AST):
-    _attributes = ("lineno", "col_offset", "end_lineno", "end_col_offset")
-
-
-def fetch(filename, **loc_data):
-    loc_node = LocationNode(**loc_data)
-    with open(filename) as file:
-        source = file.read()
-    return ast.get_source_segment(source, loc_node)
-
-
-def query(source, limit=10, show_source=True, **db_opts):
-    with connect(**db_opts) as conn:
-        tree = parse_query(source)
-        logger.info("ReizQL Tree: %r", tree)
-
-        selection = compile_edgeql(tree)
-        selection.limit = limit
-        selection.selections = [
-            EdgeQLSelector("lineno"),
-            EdgeQLSelector("col_offset"),
-            EdgeQLSelector("end_lineno"),
-            EdgeQLSelector("end_col_offset"),
-            EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
-        ]
-
-        query = as_edgeql(selection)
-        logger.info("EdgeQL query: %r", query)
-
-        for result in conn.query(query):
-            print(
-                result._module.filename
-                + ":"
-                + str(result.lineno)
-                + ":"
-                + str(result.col_offset)
-            )
-            if show_source:
-                print(
-                    fetch(
-                        result._module.filename,
-                        lineno=result.lineno,
-                        col_offset=result.col_offset,
-                        end_lineno=result.end_lineno,
-                        end_col_offset=result.end_col_offset,
-                    )
-                )
+from reiz.fetch import run_query
 
 
 def main():
@@ -66,20 +15,12 @@ def main():
         default="-",
         help="the file to parse; defaults to stdin",
     )
-    parser.add_argument(
-        "--no-source", default=True, dest="show_source", action="store_false"
-    )
-    parser.add_argument("--limit", type=int, default=10)
-    parser.add_argument("--dsn", default=get_db_settings()["dsn"])
-    parser.add_argument("--database", default=get_db_settings()["database"])
     options = parser.parse_args()
     with options.source:
-        query(
-            options.source.read(),
-            show_source=options.show_source,
-            limit=options.limit,
-            dsn=options.dsn,
-            database=options.database,
+        pprint(
+            run_query(
+                options.source.read(),
+            )
         )
 
 

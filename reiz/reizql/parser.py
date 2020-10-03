@@ -16,6 +16,9 @@ from reiz.reizql.nodes import (
 )
 
 BUILTIN_FUNCTIONS = ("ALL", "ANY")
+POSITION_ATTRIBUTES = frozenset(
+    ("lineno", "col_offset", "end_lineno", "end_col_offset")
+)
 
 
 class ReizQLSyntaxError(Exception):
@@ -79,6 +82,11 @@ def parse_call(node):
         )
 
     origin = getattr(ast, name)
+    if POSITION_ATTRIBUTES.issubset(origin._attributes):
+        positional = True
+    else:
+        positional = False
+
     if issubclass(origin, ENUM_TYPES):
         return ReizQLMatchEnum(origin.__base__.__name__, name)
     else:
@@ -100,7 +108,7 @@ def parse_call(node):
             )
             query[arg.arg] = parse(arg.value)
 
-        return ReizQLMatch(name, query)
+        return ReizQLMatch(name, query, positional=positional)
 
 
 @parse.register(ast.BinOp)
@@ -156,7 +164,10 @@ def parse_query(source):
     ensure(len(tree.body) == 1)
     ensure(isinstance(tree.body[0], ast.Expr), tree.body[0])
     ensure(isinstance(tree.body[0].value, ast.Call), tree.body[0].value)
-    return parse(tree.body[0].value)
+    root_node = parse(tree.body[0].value)
+    ensure(isinstance(root_node, ReizQLMatch), tree.body[0])
+    ensure(root_node.positional or root_node.name == "Module", tree.body[0])
+    return root_node
 
 
 def main():

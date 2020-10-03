@@ -33,6 +33,7 @@ class ReizQLLogicOperator(ReizEnum):
 class ReizQLMatch(ReizQLExpression):
     name: str
     filters: Dict[str, ReizQLExpression] = field(default_factory=dict)
+    positional: bool = False
 
 
 @dataclass(unsafe_hash=True)

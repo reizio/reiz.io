@@ -40,10 +40,13 @@ def get_stats(nodes=DEFAULT_NODES):
 
 
 def fetch(filename, **loc_data):
-    loc_node = LocationNode(**loc_data)
     with tokenize.open(filename) as file:
         source = file.read()
-    return ast.get_source_segment(source, loc_node)
+    if loc_data:
+        loc_node = LocationNode(**loc_data)
+        return ast.get_source_segment(source, loc_node)
+    else:
+        return source
 
 
 def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
@@ -55,13 +58,20 @@ def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
         selection = EdgeQLSelect(EdgeQLCall("count", [selection]))
     else:
         selection.limit = limit
-        selection.selections = [
-            EdgeQLSelector("lineno"),
-            EdgeQLSelector("col_offset"),
-            EdgeQLSelector("end_lineno"),
-            EdgeQLSelector("end_col_offset"),
-            EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
-        ]
+        if tree.positional:
+            selection.selections.extend(
+                (
+                    EdgeQLSelector("lineno"),
+                    EdgeQLSelector("col_offset"),
+                    EdgeQLSelector("end_lineno"),
+                    EdgeQLSelector("end_col_offset"),
+                    EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
+                )
+            )
+        elif tree.name == "Module":
+            selection.selections.append(EdgeQLSelector("filename"))
+        else:
+            raise Exception(f"Unexpected root matcher: {tree.name}")
 
     query = as_edgeql(selection)
     logger.info("EdgeQL query: %r", query)
@@ -74,21 +84,29 @@ def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
         query_set = conn.query(query)
 
         for result in query_set:
-            try:
-                source = fetch(
-                    result._module.filename,
-                    lineno=result.lineno,
-                    col_offset=result.col_offset,
-                    end_lineno=result.end_lineno,
-                    end_col_offset=result.end_col_offset,
+            loc_data = {}
+            if tree.positional:
+                loc_data.update(
+                    {
+                        "filename": result._module.filename,
+                        "lineno": result.lineno,
+                        "col_offset": result.col_offset,
+                        "end_lineno": result.end_lineno,
+                        "end_col_offset": result.end_col_offset,
+                    }
                 )
+            elif tree.name == "Module":
+                loc_data.update({"filename": result.filename})
+
+            try:
+                source = fetch(**loc_data)
             except Exception:
                 source = None
 
             results.append(
                 {
                     "source": source,
-                    "filename": result._module.filename,
+                    "filename": loc_data["filename"],
                 }
             )
 
