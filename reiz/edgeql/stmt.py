@@ -107,7 +107,6 @@ def unpack_filters(filters, operator=None):
     if filters is None:
         yield from ()
     elif isinstance(filters, EdgeQLSelect):
-        # AWAITING(edgedb-discuss)
         yield filters, operator
     elif isinstance(filters, EdgeQLFilter):
         yield filters, operator

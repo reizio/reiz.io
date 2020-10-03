@@ -1,5 +1,5 @@
 import functools
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from reiz.db.schema import protected_name
@@ -17,6 +17,7 @@ from reiz.reizql.nodes import (
     ReizQLSet,
 )
 from reiz.reizql.parser import ReizQLSyntaxError
+from reiz.utilities import logger
 
 __DEFAULT_FOR_TARGET = "__KEY"
 
@@ -86,43 +87,74 @@ def convert_set(node, state):
     return EdgeQLSet([compile_edgeql(item, state) for item in node.items])
 
 
+def generate_typechecked_query_item(query, base):
+    rec_list = False
+    current_query = None
+    if isinstance(query.key, EdgeQLCall) and isinstance(
+        query.key.args[0], EdgeQLFilterKey
+    ):
+        name = query.key.args[0].name
+        rec_list = True
+    elif isinstance(query.key, EdgeQLFilterKey):
+        name = query.key.name
+    else:
+        raise ReizQLSyntaxError(
+            f"Unknown matcher type for list expression: {type(query).__name__}"
+        )
+
+    key = EdgeQLAttribute(base, name)
+
+    if rec_list:
+        query.key.args[0] = key
+        return query
+    elif isinstance(query.value, EdgeQLPreparedQuery):
+        query.key = key
+        return query
+    elif isinstance(query.value, EdgeQLSelect):
+        model = protected_name(query.value.name, prefix=True)
+        verifier = EdgeQLVerify(key, EdgeQLVerifyOperator.IS, model)
+        if query.value.filters:
+            return generate_typechecked_query(query.value.filters, verifier)
+        else:
+            return EdgeQLFilter(
+                EdgeQLAttribute(base, query.key.name),
+                model,
+                EdgeQLComparisonOperator.IDENTICAL,
+            )
+    else:
+        raise ReizQLSyntaxError("Unsupported syntax")
+
+
+def generate_typechecked_selection(selection, base):
+    def replace_select(node):
+        assert isinstance(node.name, EdgeQLFilterKey)
+        node.name = EdgeQLAttribute(f"_tmp_singleton", node.name.name)
+        return EdgeQLFor("_tmp_singleton", EdgeQLSet([base]), node)
+
+    def replace_node(node):
+        if isinstance(node, EdgeQLVerify):
+            node.query = replace_select(node.query)
+        elif isinstance(node, EdgeQLSelect):
+            return replace_select(node)
+        else:
+            logger.warning("Unhandled type: %s", type(node).__name__)
+        return node
+
+    if selection.with_block:
+        namespace = selection.with_block.assignments
+        for key, node in namespace.copy().items():
+            namespace[key] = replace_node(node)
+
+    return selection
+
+
 def generate_typechecked_query(filters, base):
     base_query = None
     for query, operator in unpack_filters(filters):
-        rec_list = False
-        current_query = None
-        if isinstance(query.key, EdgeQLCall) and isinstance(
-            query.key.args[0], EdgeQLFilterKey
-        ):
-            name = query.key.args[0].name
-            rec_list = True
-        elif isinstance(query.key, EdgeQLFilterKey):
-            name = query.key.name
-        else:
-            raise ReizQLSyntaxError(
-                f"Unknown matcher type for list expression: {type(query).__name__}"
-            )
-
-        key = EdgeQLAttribute(base, name)
-
-        if rec_list:
-            query.key.args[0] = key
-            current_query = query
-        elif isinstance(query.value, EdgeQLPreparedQuery):
-            current_query = replace(query, key=key)
-        elif isinstance(query.value, EdgeQLSelect):
-            model = protected_name(query.value.name, prefix=True)
-            verifier = EdgeQLVerify(key, EdgeQLVerifyOperator.IS, model)
-            if query.value.filters:
-                current_query = generate_typechecked_query(
-                    query.value.filters, verifier
-                )
-            else:
-                current_query = EdgeQLFilter(
-                    EdgeQLAttribute(base, query.key.name),
-                    model,
-                    EdgeQLComparisonOperator.IDENTICAL,
-                )
+        if isinstance(query, EdgeQLSelect):
+            current_query = generate_typechecked_selection(query, base)
+        elif isinstance(query, EdgeQLFilter):
+            current_query = generate_typechecked_query_item(query, base)
         else:
             raise ReizQLSyntaxError("Unsupported syntax")
 
@@ -204,17 +236,18 @@ def convert_list(node, state):
         filters = convert_match(item).filters
 
         # If there are no value queries, only type-check
+        name = f"__item_{index}_{id(filters)}"
         if filters is None:
+            assignments[name] = selection
             select_filters = merge_filters(
                 select_filters,
                 EdgeQLFilter(
-                    selection,
+                    EdgeQLName(name),
                     protected_name(item.name, prefix=True),
                     EdgeQLComparisonOperator.IDENTICAL,
                 ),
             )
         else:
-            name = f"__item_{index}_{state.depth}"
             assignments[name] = EdgeQLVerify(
                 selection,
                 EdgeQLVerifyOperator.IS,
@@ -226,7 +259,6 @@ def convert_list(node, state):
             )
 
     if assignments:
-        state.depth += 1
         with_block = EdgeQLWithBlock(assignments)
     else:
         with_block = None
