@@ -1,6 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass, field
-from enum import auto
+from enum import IntEnum, auto
 from typing import Dict, List, Union
 
 from reiz.utilities import ReizEnum
@@ -25,7 +25,7 @@ class ReizQLIgnore(ReizQLExpression):
 
 
 @ReizQLObject.register
-class ReizQLLogicOperator(ReizEnum):
+class ReizQLLogicOperator(ReizEnum, IntEnum):
     OR = auto()
 
 
