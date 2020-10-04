@@ -22,7 +22,6 @@ class EdgeQLVerifyOperator(ReizEnum):
 
 @EdgeQLExpression.register
 class EdgeQLLogicOperator(ReizEnum):
-    IN = auto()
     OR = auto()
     AND = auto()
 

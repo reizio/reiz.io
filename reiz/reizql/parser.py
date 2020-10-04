@@ -131,11 +131,8 @@ def parse_binop(node):
 def parse_constant(node):
     if node.value is Ellipsis:
         return ReizQLIgnore
-    elif type(node.value) is int:
-        value = repr(node.value)
     else:
-        value = repr(str(node.value))
-    return ReizQLConstant(value)
+        return ReizQLConstant(repr(str(node.value)))
 
 
 @parse.register(ast.List)
