@@ -1,7 +1,7 @@
 import ast
 import functools
 
-from reiz.db.schema import ATOMIC_TYPES, ENUM_TYPES
+from reiz.db.schema import ENUM_TYPES
 from reiz.reizql.nodes import (
     ReizQLBuiltin,
     ReizQLConstant,
@@ -135,7 +135,7 @@ def parse_constant(node):
         value = repr(node.value)
     else:
         value = repr(str(node.value))
-    return ReizQLConstant(repr(str(node.value)))
+    return ReizQLConstant(value)
 
 
 @parse.register(ast.List)

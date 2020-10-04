@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import auto
 
-from reiz.db.schema import protected_name
 from reiz.edgeql.base import (
     EdgeQLExpression,
     construct,

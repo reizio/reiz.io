@@ -1,9 +1,32 @@
 import functools
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from reiz.db.schema import protected_name
-from reiz.edgeql import *
+from reiz.edgeql import (
+    EdgeQLAttribute,
+    EdgeQLCall,
+    EdgeQLCast,
+    EdgeQLComparisonOperator,
+    EdgeQLFilter,
+    EdgeQLFilterChain,
+    EdgeQLFilterKey,
+    EdgeQLFilterType,
+    EdgeQLFor,
+    EdgeQLLogicOperator,
+    EdgeQLName,
+    EdgeQLNot,
+    EdgeQLObject,
+    EdgeQLPreparedQuery,
+    EdgeQLProperty,
+    EdgeQLSelect,
+    EdgeQLSet,
+    EdgeQLVerify,
+    EdgeQLVerifyOperator,
+    EdgeQLWithBlock,
+    merge_filters,
+    unpack_filters,
+)
 from reiz.reizql.nodes import (
     ReizQLBuiltin,
     ReizQLConstant,
@@ -89,7 +112,6 @@ def convert_set(node, state):
 
 def generate_typechecked_query_item(query, base):
     rec_list = False
-    current_query = None
     if isinstance(query.key, EdgeQLCall) and isinstance(
         query.key.args[0], EdgeQLFilterKey
     ):

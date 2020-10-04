@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import ast
 from argparse import ArgumentParser, FileType
 from pprint import pprint
 

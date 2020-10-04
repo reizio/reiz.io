@@ -149,7 +149,6 @@ class GraphQLGenerator(pyasdl.ASDLVisitor):
         )
 
     def visit_Sum(self, node, name):
-        constructor_names = [constructor.name for constructor in node.types]
         if is_simple(node):
             ENUM_TYPES.add(name)
             yield QLModel(

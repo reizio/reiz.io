@@ -13,7 +13,7 @@ from flask_limiter.util import get_remote_address
 from reiz.edgeql import as_edgeql
 from reiz.fetch import get_stats, run_query
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
-from reiz.utilities import get_config_settings, logger, normalize
+from reiz.utilities import get_config_settings, normalize
 
 CACHING = None
 

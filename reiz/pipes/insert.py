@@ -7,8 +7,6 @@ from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
-from edgedb.errors import InternalServerError
-
 from reiz.db.connection import connect
 from reiz.edgeql import EdgeQLSelect, EdgeQLSelector
 from reiz.serialization.serializer import insert_file

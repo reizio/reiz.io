@@ -86,7 +86,7 @@ def get_package(
 ) -> Tuple[str, Optional[Path]]:
     try:
         return package, download_and_extract(package, directory, version)
-    except Exception as e:
+    except Exception:
         logger.exception("caught exception while fetching %r", package)
         return package, None
 
