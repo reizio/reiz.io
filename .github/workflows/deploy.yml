@@ -1,0 +1,16 @@
+name: remote ssh command
+on: [push]
+jobs:
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy the reiz.io
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST }}
+        port: ${{ secrets.PORT }}
+        key: ${{ secrets.SSH_KEY }}
+        username: ${{ secrets.USERNAME }}
+        script: /usr/bin/bash /home/isidentical/deploy.sh
