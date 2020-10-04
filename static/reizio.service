@@ -1,0 +1,13 @@
+[Unit]
+Description=api.tree.science
+After=network.target
+
+[Service]
+User=isidentical
+Group=www-data
+WorkingDirectory=/home/isidentical/reiz.io
+Environment="PATH=/home/isidentical/reiz.io/.venv/bin"
+ExecStart=/home/isidentical/reiz.io/.venv/bin/gunicorn -t 120 --graceful-timeout 120 --workers 16 --bind unix:reizio.sock -m 007 reiz.web.wsgi:app
+
+[Install]
+WantedBy=multi-user.target
