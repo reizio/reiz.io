@@ -11,7 +11,7 @@ from reiz.edgeql import (
     EdgeQLUnion,
     as_edgeql,
 )
-from reiz.reizql import compile_edgeql, parse_query
+from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
 from reiz.utilities import get_db_settings, logger
 
 DEFAULT_LIMIT = 10
@@ -58,20 +58,33 @@ def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
         selection = EdgeQLSelect(EdgeQLCall("count", [selection]))
     else:
         selection.limit = limit
-        if tree.positional and tree.name != "arg":
+        if tree.positional:
             selection.selections.extend(
                 (
                     EdgeQLSelector("lineno"),
                     EdgeQLSelector("col_offset"),
                     EdgeQLSelector("end_lineno"),
                     EdgeQLSelector("end_col_offset"),
-                    EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
                 )
             )
+            # FIX-IN(schema-change)
+            module_matcher = EdgeQLSelector(
+                "_module", [EdgeQLSelector("filename")]
+            )
+            if tree.name == "arg":
+                if "annotation" not in tree.filters:
+                    raise ReizQLSyntaxError(
+                        "Matching arg() without a valid annotation is not possible right now"
+                    )
+                selection.selections.append(
+                    EdgeQLSelector("annotation", [module_matcher])
+                )
+            else:
+                selection.selections.append(module_matcher)
         elif tree.name == "Module":
             selection.selections.append(EdgeQLSelector("filename"))
         else:
-            raise Exception(f"Unexpected root matcher: {tree.name}")
+            raise ReizQLSyntaxError(f"Unexpected root matcher: {tree.name}")
 
     query = as_edgeql(selection)
     logger.info("EdgeQL query: %r", query)
@@ -86,9 +99,13 @@ def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
         for result in query_set:
             loc_data = {}
             if tree.positional:
+                if tree.name == "arg":
+                    filename = result.annotation._module.filename
+                else:
+                    filename = result._module.filename
                 loc_data.update(
                     {
-                        "filename": result._module.filename,
+                        "filename": filename,
                         "lineno": result.lineno,
                         "col_offset": result.col_offset,
                         "end_lineno": result.end_lineno,
