@@ -58,7 +58,7 @@ def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
         selection = EdgeQLSelect(EdgeQLCall("count", [selection]))
     else:
         selection.limit = limit
-        if tree.positional:
+        if tree.positional and tree.name != "arg":
             selection.selections.extend(
                 (
                     EdgeQLSelector("lineno"),

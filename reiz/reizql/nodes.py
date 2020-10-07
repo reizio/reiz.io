@@ -74,3 +74,8 @@ class ReizQLConstant(ReizQLExpression):
 @dataclass(unsafe_hash=True)
 class ReizQLNot(ReizQLExpression):
     value: ReizQLExpression
+
+
+@dataclass(unsafe_hash=True)
+class ReizQLAttr(ReizQLExpression):
+    attr: str

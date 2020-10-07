@@ -28,6 +28,7 @@ from reiz.edgeql import (
     unpack_filters,
 )
 from reiz.reizql.nodes import (
+    ReizQLAttr,
     ReizQLBuiltin,
     ReizQLConstant,
     ReizQLIgnore,
@@ -305,3 +306,8 @@ def convert_atomic(node, state):
         return compile_edgeql(ReizQLMatch("Sentinel"))
     else:
         return EdgeQLPreparedQuery(str(node.value))
+
+
+@compile_edgeql.register(ReizQLAttr)
+def convert_attr(node, state):
+    return EdgeQLFilterKey(node.attr)

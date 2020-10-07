@@ -3,6 +3,7 @@ import functools
 
 from reiz.db.schema import ENUM_TYPES
 from reiz.reizql.nodes import (
+    ReizQLAttr,
     ReizQLBuiltin,
     ReizQLConstant,
     ReizQLIgnore,
@@ -149,6 +150,9 @@ def parse_set(node):
 def parse_unary(node):
     if isinstance(node.op, ast.Not):
         return ReizQLNot(parse(node.operand))
+    elif isinstance(node.op, ast.Invert):
+        ensure(isinstance(node.operand, ast.Name))
+        return ReizQLAttr(node.operand.id)
     else:
         raise ReizQLSyntaxError.from_node(node, "unknown unary operator")
 
