@@ -92,6 +92,7 @@ filter := matcher
         | ignore
         | or_filter
         | negated
+        | attribute
         | ATOM
 ```
 
@@ -121,10 +122,16 @@ like `Tuple(ALL(not Constant()))`.
 negated := "not" filter
 ```
 
+### Attribute
+Fetch the value of an attribute, like `Tuple(lineno = not ~end_lineno)`.
+
+```
+attribute := '~' NAME
+```
+
 ## Example Queries
 Match all function definition where there is a `@classmethod` or a `@staticmethod`
 decorator and the body consists of a single `return` statement which returns a tuple.
 ```py
 FunctionDef(decorator_list={Name('classmethod' | 'staticmethod')}, body = [Return(Tuple())])
 ```
-
