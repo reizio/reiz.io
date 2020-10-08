@@ -85,13 +85,13 @@ module Python
     comprehension = (expr target, expr iter, expr* ifs, int is_async)
 
     excepthandler = ExceptHandler(expr? type, identifier? name, stmt* body)
-                    attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset)
+                    attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, Module? _module)
 
     arguments = (arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs,
                  expr* kw_defaults, arg? kwarg, expr* defaults)
 
     arg = (identifier arg, expr? annotation, string? type_comment)
-           attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset)
+           attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, Module? _module)
 
     keyword = (identifier? arg, expr value)
 

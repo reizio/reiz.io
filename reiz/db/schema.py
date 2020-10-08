@@ -9,7 +9,7 @@ ENUM_TYPES = (
     ast.cmpop,
 )
 
-MODULE_ANNOTATED_TYPES = (ast.expr, ast.stmt)
+MODULE_ANNOTATED_TYPES = (ast.expr, ast.stmt, ast.arg, ast.excepthandler)
 
 ATOMIC_TYPES = (int, str)
 

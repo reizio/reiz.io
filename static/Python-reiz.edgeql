@@ -360,6 +360,7 @@ START MIGRATION TO {
             required property col_offset -> int64;
             property end_lineno -> int64;
             property end_col_offset -> int64;
+            link _module -> PyModule;
         }
         type ExceptHandler extending excepthandler, AST {
             link type -> expr;
@@ -395,6 +396,7 @@ START MIGRATION TO {
             required property col_offset -> int64;
             property end_lineno -> int64;
             property end_col_offset -> int64;
+            link _module -> PyModule;
         }
         type keyword {
             property arg -> str;

@@ -1,6 +1,5 @@
 import ast
 import tokenize
-from functools import lru_cache
 
 from reiz.db.connection import connect
 from reiz.db.schema import protected_name
@@ -22,7 +21,6 @@ class LocationNode(ast.AST):
     _attributes = ("lineno", "col_offset", "end_lineno", "end_col_offset")
 
 
-@lru_cache(8)
 def get_stats(nodes=DEFAULT_NODES):
     query = as_edgeql(
         EdgeQLSelect(
@@ -65,22 +63,9 @@ def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
                     EdgeQLSelector("col_offset"),
                     EdgeQLSelector("end_lineno"),
                     EdgeQLSelector("end_col_offset"),
+                    EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
                 )
             )
-            # FIX-IN(schema-change)
-            module_matcher = EdgeQLSelector(
-                "_module", [EdgeQLSelector("filename")]
-            )
-            if tree.name == "arg":
-                if "annotation" not in tree.filters:
-                    raise ReizQLSyntaxError(
-                        "Matching arg() without a valid annotation is not possible right now"
-                    )
-                selection.selections.append(
-                    EdgeQLSelector("annotation", [module_matcher])
-                )
-            else:
-                selection.selections.append(module_matcher)
         elif tree.name == "Module":
             selection.selections.append(EdgeQLSelector("filename"))
         else:
@@ -99,13 +84,9 @@ def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
         for result in query_set:
             loc_data = {}
             if tree.positional:
-                if tree.name == "arg":
-                    filename = result.annotation._module.filename
-                else:
-                    filename = result._module.filename
                 loc_data.update(
                     {
-                        "filename": filename,
+                        "filename": result._module.filename,
                         "lineno": result.lineno,
                         "col_offset": result.col_offset,
                         "end_lineno": result.end_lineno,
