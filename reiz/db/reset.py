@@ -12,26 +12,18 @@ from reiz.utilities import get_db_settings
 def drop_all_connection():
     print("Stopping the server...")
     subprocess.run(
-        [
-            Path("~/.edgedb/bin/edgedb").expanduser(),
-            "-Idefault",
-            "server",
-            "stop",
-        ]
+        [Path("~/.edgedb/bin/edgedb").expanduser(), "server", "stop"]
     )
     print("Re-starting the server...")
     subprocess.check_call(
-        [
-            Path("~/.edgedb/bin/edgedb").expanduser(),
-            "-Idefault",
-            "server",
-            "start",
-        ]
+        [Path("~/.edgedb/bin/edgedb").expanduser(), "server", "start"]
     )
 
 
 def drop_and_load_db(schema, dsn, database):
-    drop_all_connection()
+    print("Re-starting the server [using systemd]...")
+    subprocess.check_call(["systemctl", "restart", "edgedb-server@default"])
+
     with closing(edgedb.connect(dsn, database="edgedb")) as connection:
         with suppress(InvalidReferenceError):
             connection.execute(f"DROP DATABASE {database}")
