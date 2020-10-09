@@ -98,7 +98,8 @@ def optimize_select(node, state=None):
     filters = None
     for query, operator in unpack_filters(node.filters):
         if (
-            isinstance(query.key, EdgeQLFilterKey)
+            isinstance(query, EdgeQLFilter)
+            and isinstance(query.key, EdgeQLFilterKey)
             and isinstance(query.value, EdgeQLSelect)
             and query.value.is_bare()
         ):
