@@ -47,38 +47,32 @@ def fetch(filename, **loc_data):
         return source
 
 
-def run_query(reiz_ql, stats=False, limit=DEFAULT_LIMIT):
+def run_query(reiz_ql, limit=DEFAULT_LIMIT):
     tree = parse_query(reiz_ql)
     logger.info("ReizQL Tree: %r", tree)
 
     selection = compile_edgeql(tree)
-    if stats:
-        selection = EdgeQLSelect(EdgeQLCall("count", [selection]))
-    else:
-        selection.limit = limit
-        if tree.positional:
-            selection.selections.extend(
-                (
-                    EdgeQLSelector("lineno"),
-                    EdgeQLSelector("col_offset"),
-                    EdgeQLSelector("end_lineno"),
-                    EdgeQLSelector("end_col_offset"),
-                    EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
-                )
+    selection.limit = limit
+    if tree.positional:
+        selection.selections.extend(
+            (
+                EdgeQLSelector("lineno"),
+                EdgeQLSelector("col_offset"),
+                EdgeQLSelector("end_lineno"),
+                EdgeQLSelector("end_col_offset"),
+                EdgeQLSelector("_module", [EdgeQLSelector("filename")]),
             )
-        elif tree.name == "Module":
-            selection.selections.append(EdgeQLSelector("filename"))
-        else:
-            raise ReizQLSyntaxError(f"Unexpected root matcher: {tree.name}")
+        )
+    elif tree.name == "Module":
+        selection.selections.append(EdgeQLSelector("filename"))
+    else:
+        raise ReizQLSyntaxError(f"Unexpected root matcher: {tree.name}")
 
     query = as_edgeql(selection)
     logger.info("EdgeQL query: %r", query)
 
     results = []
     with connect(**get_db_settings()) as conn:
-        if stats:
-            return conn.query_one(query)
-
         query_set = conn.query(query)
 
         for result in query_set:

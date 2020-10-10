@@ -68,8 +68,8 @@ def query():
 
     reiz_ql = request.json["query"]
     try:
-        if stats := request.json.get("stats", False) or not CACHING:
-            results = run_query(reiz_ql, stats=stats)
+        if not CACHING:
+            results = run_query(reiz_ql)
         else:
             results = run_cached_query(reiz_ql)
     except ReizQLSyntaxError as syntax_err:
