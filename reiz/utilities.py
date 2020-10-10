@@ -10,6 +10,16 @@ from typing import ContextManager, List
 
 from reiz.db.connection import DEFAULT_DATABASE, DEFAULT_DSN
 
+try:
+    import black
+except ModuleNotFoundError:
+    import pprint
+
+    USE_PPRINT = True
+else:
+    USE_PPRINT = False
+    BLACK_MODE = black.Mode(line_length=65)
+
 DEFAULT_CONFIG_PATH = Path("~/.local/reiz.json").expanduser()
 
 
@@ -25,7 +35,7 @@ def add_logging_level(name, value):
 add_logging_level("TRACE", 5)
 logger = logging.getLogger("source")
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="[%(asctime)s] %(funcName)-15s --- %(message)s",
     datefmt="%m-%d %H:%M",
 )
@@ -82,3 +92,11 @@ def normalize(data):
             data[key] = repr(value)
 
     return data
+
+
+# from reiz.utilities import pprint;pprint()
+def pprint(obj):
+    if USE_PPRINT:
+        pprint.pprint(obj)
+    else:
+        print(black.format_str(repr(obj), mode=BLACK_MODE))
