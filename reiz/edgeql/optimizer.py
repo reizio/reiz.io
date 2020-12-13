@@ -54,7 +54,7 @@ def optimize_edgeql(node, state=None):
     return generic_visit(node, state)
 
 
-@optimize_edgeql.register(EdgeQLFilter)
+# @optimize_edgeql.register(EdgeQLFilter)
 def optimize_filter(node, state):
     op = node.operator
 
@@ -91,7 +91,7 @@ def optimize_filter(node, state):
     return node
 
 
-@optimize_edgeql.register(EdgeQLSelect)
+# @optimize_edgeql.register(EdgeQLSelect)
 def optimize_select(node, state=None):
     node = generic_visit(node, state)
 
@@ -101,13 +101,15 @@ def optimize_select(node, state=None):
             isinstance(query, EdgeQLFilter)
             and isinstance(query.key, EdgeQLFilterKey)
             and isinstance(query.value, EdgeQLSelect)
-            and query.value.is_bare()
         ):
-            query = dataclasses.replace(
-                query,
-                value=protected_name(query.value.name, prefix=True),
-                operator=EdgeQLComparisonOperator.IDENTICAL,
-            )
+            select = query.value
+            if select.is_bare("name"):
+                query = dataclasses.replace(
+                    query,
+                    value=protected_name(query.value.name, prefix=True),
+                    operator=EdgeQLComparisonOperator.IDENTICAL,
+                )
+
         filters = merge_filters(filters, query, operator)
     node = dataclasses.replace(node, filters=filters)
     return node

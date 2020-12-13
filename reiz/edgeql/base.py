@@ -18,6 +18,10 @@ class EdgeQLExpression(EdgeQLObject):
     ...
 
 
+class EdgeQLPseudo(EdgeQLObject):
+    ...
+
+
 @dataclass(unsafe_hash=True)
 class EdgeQLPreparedQuery(EdgeQLObject):
     value: str
@@ -51,3 +55,9 @@ def construct_sequence(sequence):
 def with_parens(value, combo="()"):
     left, right = combo
     return f"{left}{value}{right}"
+
+
+def real_object(obj):
+    while isinstance(obj, EdgeQLPseudo):
+        obj = obj.value
+    return obj

@@ -114,7 +114,7 @@ class QLModel:
 
 def is_simple(sum_t: pyasdl.Sum) -> bool:
     for constructor in sum_t.types:
-        if constructor.fields is not None:
+        if constructor.fields:
             return False
     else:
         return True

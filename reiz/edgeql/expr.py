@@ -5,6 +5,7 @@ from enum import auto
 
 from reiz.edgeql.base import (
     EdgeQLExpression,
+    EdgeQLPseudo,
     construct,
     construct_sequence,
     with_parens,
@@ -83,7 +84,7 @@ class EdgeQLName(EdgeQLExpression):
 
 class EdgeQLSpecialName(EdgeQLName):
     def construct(self):
-        return self.PREFIX + self.name
+        return self.PREFIX + construct(self.name)
 
 
 @dataclass(unsafe_hash=True)
@@ -104,10 +105,10 @@ class EdgeQLProperty(EdgeQLSpecialName):
 @dataclass(unsafe_hash=True)
 class EdgeQLAttribute(EdgeQLExpression):
     base: EdgeQLObject
-    attr: str
+    name: str
 
     def construct(self):
-        return construct(self.base) + "." + self.attr
+        return construct(self.base) + "." + self.name
 
 
 @dataclass(unsafe_hash=True)
@@ -138,8 +139,25 @@ class EdgeQLReference(EdgeQLExpression):
 
 
 @dataclass(unsafe_hash=True)
-class EdgeQLNot(EdgeQLExpression):
+class EdgeQLSubscript(EdgeQLExpression):
+    value: EdgeQLObject
+    index: int
+
+    def construct(self):
+        return construct(self.value) + "[" + str(self.index) + "]"
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLNot(EdgeQLPseudo):
     value: EdgeQLObject
 
     def construct(self):
         return "not " + construct(self.value)
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLGroup(EdgeQLPseudo):
+    value: EdgeQLObject
+
+    def construct(self):
+        return "(" + construct(self.value) + ")"

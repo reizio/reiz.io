@@ -5,3 +5,4 @@ redis
 wheel
 gunicorn
 flask-cors
+black==20.8b1

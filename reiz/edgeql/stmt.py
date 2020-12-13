@@ -115,19 +115,18 @@ def unpack_filters(filters, operator=None):
         yield from unpack_filters(filters.right, filters.operator)
 
 
-def merge_filters(left_filter, right_filter, operator=None):
+def merge_filters(left_filter, right_filter, operator=EdgeQLLogicOperator.AND):
     if left_filter is None:
         return right_filter
     else:
-        operator = operator or EdgeQLLogicOperator.AND
         return EdgeQLFilterChain(left_filter, right_filter, operator)
 
 
 @dataclass(unsafe_hash=True)
 class EdgeQLVerify(EdgeQLComponent):
     query: EdgeQLObject
-    operator: EdgeQLVerifyOperator
     argument: EdgeQLObject
+    operator: EdgeQLVerifyOperator = EdgeQLVerifyOperator.IS
 
     def construct(self):
         query = construct(self.query)
@@ -179,10 +178,13 @@ class EdgeQLSelect(EdgeQLStatement):
     selections: Sequence[EdgeQLSelector] = field(default_factory=list)
     with_block: Optional[EdgeQLWithBlock] = None
 
-    def is_bare(self):
-        return self == self.__class__(name=self.name) and isinstance(
-            self.name, str
-        )
+    def is_bare(self, *parameters):
+        data = {keyword: getattr(self, keyword) for keyword in parameters}
+        for keyword in parameters:
+            if keyword == "name" and not isinstance(self.name, str):
+                return False
+        else:
+            return self == self.__class__(**data)
 
     def construct(self):
         if self.with_block:
@@ -237,7 +239,7 @@ class EdgeQLFor(EdgeQLStatement):
     def construct(self):
         query = "FOR "
         query += construct(self.target)
-        query += " in "
+        query += " IN "
         query += construct(self.iterator)
         query += " UNION "
         query += construct(self.generator)
