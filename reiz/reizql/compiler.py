@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import singledispatch
+from types import SimpleNamespace
 
 from reiz.db.schema import protected_name
 from reiz.edgeql import *
@@ -65,7 +66,7 @@ class CompilerState:
         return self.as_query(codegen(value, self))
 
     def as_query(self, query):
-        if not isinstance(real_object(query), EdgeQLFilterType):
+        if not is_edgeql_filter_expr(real_object(query)):
             query = EdgeQLFilter(generate_type_checked_key(self), query)
         return query
 
@@ -233,6 +234,44 @@ def compile_sequence(node, state):
     object_verifier = EdgeQLSelect(filters, with_block=scope)
 
     return merge_filters(length_verifier, object_verifier)
+
+
+@dataclass
+class Signature:
+    name: str
+    args: List[str] = field(default_factory=list)
+
+    def bind(self, node):
+        if node.keywords:
+            raise ReizQLSyntaxError(
+                f"Built-in function {self.name} doesn't take any keyword arguments"
+            )
+        elif len(node.args) != len(self.args):
+            amount = "many" if len(node.args) > len(self.args) else "less"
+            raise ReizQLSyntaxError(f"Too {amount} arguments for {self.name}")
+        else:
+            return SimpleNamespace(**dict(zip(self.args, node.args)))
+
+
+_BUILTIN_FUNC_SIGNATURES = {
+    "ALL": Signature("ALL", ["value"]),
+    "ANY": Signature("ANY", ["value"]),
+}
+
+
+def convert_all_any(node, state, arguments):
+    query = construct(codegen(arguments.value, state))
+    return EdgeQLCall(node.name.lower(), [query])
+
+
+@codegen.register(ReizQLBuiltin)
+def convert_call(node, state):
+    if node.name in ("ANY", "ALL"):
+        return convert_all_any(
+            node, state, _BUILTIN_FUNC_SIGNATURES[node.name].bind(node)
+        )
+    else:
+        raise ValueError("Compiler check failed: unknown builtin function!")
 
 
 def compile_edgeql(node):

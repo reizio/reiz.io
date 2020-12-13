@@ -14,6 +14,7 @@ from reiz.edgeql.base import (
     with_parens,
 )
 from reiz.edgeql.expr import (
+    EdgeQLCall,
     EdgeQLComparisonOperator,
     EdgeQLFilterKey,
     EdgeQLLogicOperator,
@@ -90,6 +91,15 @@ class EdgeQLFilterChain(EdgeQLComponent):
 
 
 EdgeQLFilterType = (EdgeQLFilter, EdgeQLFilterChain)
+
+
+def is_edgeql_filter_expr(expr):
+    if isinstance(expr, EdgeQLFilterType):
+        return True
+    elif isinstance(expr, EdgeQLCall) and expr.func in {"all", "any"}:
+        return True
+    else:
+        return False
 
 
 def make_filter(**kwargs):
