@@ -16,7 +16,7 @@ from reiz.reizql.nodes import (
     ReizQLSet,
 )
 
-BUILTIN_FUNCTIONS = ("ALL", "ANY")
+BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN")
 POSITION_ATTRIBUTES = frozenset(
     ("lineno", "col_offset", "end_lineno", "end_col_offset")
 )
@@ -79,7 +79,7 @@ def parse_call(node):
         return ReizQLBuiltin(
             name,
             [parse(arg) for arg in node.args],
-            {keyword: parse(keyword) for keyword in node.keywords},
+            {keyword.arg: parse(keyword.value) for keyword in node.keywords},
         )
 
     origin = getattr(ast, name)
@@ -133,7 +133,7 @@ def parse_constant(node):
     if node.value is Ellipsis:
         return ReizQLIgnore
     else:
-        return ReizQLConstant(repr(str(node.value)))
+        return ReizQLConstant(repr(node.value))
 
 
 @parse.register(ast.List)

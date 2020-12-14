@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import singledispatch
 from types import SimpleNamespace
+from typing import Any, ClassVar, Dict, List, Optional
 
 from reiz.db.schema import protected_name
 from reiz.edgeql import *
@@ -256,39 +257,99 @@ def compile_sequence(node, state):
 @dataclass
 class Signature:
     name: str
-    args: List[str] = field(default_factory=list)
+    func: Callable
+    params: List[str] = field(default_factory=set)
+    defaults: Dict[str, Any] = field(default_factory=list)
+
+    _FUNCTIONS: ClassVar[Dict[str, Callable]] = {}
+
+    @classmethod
+    def register(cls, name, *args, **kwargs):
+        def wrapper(func):
+            cls._FUNCTIONS[name] = cls(name, func, *args, **kwargs)
+            return func
+
+        return wrapper
+
+    def codegen(self, node, state):
+        return self.func(node, state, self.bind(node))
 
     def bind(self, node):
-        if node.keywords:
-            raise ReizQLSyntaxError(
-                f"Built-in function {self.name} doesn't take any keyword arguments"
-            )
-        elif len(node.args) != len(self.args):
-            amount = "many" if len(node.args) > len(self.args) else "less"
-            raise ReizQLSyntaxError(f"Too {amount} arguments for {self.name}")
-        else:
-            return SimpleNamespace(**dict(zip(self.args, node.args)))
+        bound_args = {}
+        params = self.params.copy()
+        for argument in node.args:
+            if len(params) == 0:
+                raise ReizQLSyntaxError(
+                    f"{self.name!r} got too many positional arguments"
+                )
+            bound_args[params.pop(0)] = argument
+
+        for keyword, value in node.keywords.items():
+            if keyword not in params:
+                raise ReizQLSyntaxError(
+                    f"{self.name!r} got an unexpected keyword argument {keyword!r}"
+                )
+            params.remove(keyword)
+            bound_args[keyword] = value
+
+        for param in params.copy():
+            if param not in self.defaults:
+                raise ReizQLSyntaxError(
+                    f"{self.name!r} requires {param!r} argument"
+                )
+            bound_args[param] = self.defaults[param]
+
+        return SimpleNamespace(**bound_args)
 
 
-_BUILTIN_FUNC_SIGNATURES = {
-    "ALL": Signature("ALL", ["value"]),
-    "ANY": Signature("ANY", ["value"]),
-}
+def builtin_type_error(func, expected):
+    raise ReizQLSyntaxError(f"{func!r} expects {expected}")
 
 
+@Signature.register("ALL", ["value"])
+@Signature.register("ANY", ["value"])
 def convert_all_any(node, state, arguments):
     query = construct(codegen(arguments.value, state))
     return as_edgeql_filter_expr(EdgeQLCall(node.name.lower(), [query]))
 
 
+@Signature.register("LEN", ["min", "max"], {"min": None, "max": None})
+def convert_length(node, state, arguments):
+    if arguments.min is None and arguments.max is None:
+        raise ReizQLSyntaxError("'LEN' requires at least 1 argument")
+
+    count = EdgeQLCall("count", [generate_type_checked_key(state)])
+    filters = None
+    for value, operator in [
+        (arguments.min, EdgeQLComparisonOperator.GTE),
+        (arguments.max, EdgeQLComparisonOperator.LTE),
+    ]:
+        if value is None:
+            continue
+
+        if not (isinstance(value, ReizQLConstant) and value.value.isdigit()):
+            builtin_type_error("LEN", "integers")
+
+        try:
+            value = str(int(value.value))
+        except ValueError:
+            builtin_type_error("LEN", "integers")
+
+        filters = merge_filters(
+            filters, EdgeQLFilter(count, EdgeQLPreparedQuery(value), operator)
+        )
+
+    assert filters is not None
+    return filters
+
+
 @codegen.register(ReizQLBuiltin)
 def convert_call(node, state):
-    if node.name in ("ANY", "ALL"):
-        return convert_all_any(
-            node, state, _BUILTIN_FUNC_SIGNATURES[node.name].bind(node)
-        )
-    else:
+    signature = Signature._FUNCTIONS.get(node.name)
+    if signature is None:
         raise ValueError("Compiler check failed: unknown builtin function!")
+
+    return signature.codegen(node, state)
 
 
 def compile_edgeql(node):

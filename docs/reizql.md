@@ -76,19 +76,20 @@ all UPPER-CASE.
 - `ANY($0)` very similiar to `ALL($0)` but does the same thing if any of
   the items matched. Can be used to optimize cases where there is a set
   adapter with a single item.
+- `LEN(min=$0?, max=$1?)` is a matcher to match the length of a list value.
+  Can be either presented as `LEN(min=3, max=5)` or `LEN(min=3)`/`LEN(max=5)`.
+  The minimum and the maximum range is included (think them like `>=`/`<=`)
+  operators.
 
 ### Filters
-Filters are a common form to describe the look of an source code.
-They might be matchers (such as `left=Constant(1)`); they might be
-list adapters, which means that both type and value is checked (such
-as `body=[Assign(), Return()]`); they might be set adapters, which
-means check any of these are in that sequence (such `body={Assign(),
-Return()}`), or they might be ATOMs (such as `Constant(1)` or
-`FunctionDef('foo')`)
+Filters are common forms to describe the syntactic representation of
+the target source code. They might be matchers (such as `left=Constant(1)`);
+they might be list adapters, which means that both type and value is checked
+(such as `body=[Assign(), Return()]`); or they might be ATOMs (such as
+`Constant(1)` or `FunctionDef('foo')`)
 ```
 filter := matcher
         | '[' filter* ']'
-        | '{' filter* ']'
         | ignore
         | or_filter
         | negated
@@ -133,5 +134,10 @@ attribute := '~' NAME
 Match all function definition where there is a `@classmethod` or a `@staticmethod`
 decorator and the body consists of a single `return` statement which returns a tuple.
 ```py
-FunctionDef(decorator_list={Name('classmethod' | 'staticmethod')}, body = [Return(Tuple())])
+FunctionDef(
+    decorator_list=[
+        Name('classmethod' | 'staticmethod')
+    ],
+    body = [..., Return(Call())]
+)
 ```
