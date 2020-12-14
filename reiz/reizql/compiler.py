@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import singledispatch
@@ -20,9 +21,8 @@ class CompilerState:
     pointer: Optional[str] = None
     parents: List[CompilerState] = field(default_factory=list)
 
-    # Properties is a general way to store states (e.g on_enumeration)
-    # through all the blocks (inherited through parent to all children)
-    _properties: Dict[str, int] = field(default_factory=dict)
+    # hand properties store data (like 'enumeration start depth')
+    properties: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_parent(cls, name, parent):
@@ -30,7 +30,7 @@ class CompilerState:
             name,
             depth=parent.depth + 1,
             parents=parent.parents + [parent],
-            _properties=parent._properties,
+            properties=parent.properties,
         )
 
     @property
@@ -47,19 +47,25 @@ class CompilerState:
             self.pointer = _old_pointer
 
     @contextmanager
-    def temp_property(self, prop, value=1):
-        _preserved_value = self.get_property(prop)
+    def temp_flag(self, flag, value=True):
+        _preserved_value = self.is_flag_set(flag)
         try:
-            self.set_property(prop, value)
+            self.set_flag(flag, value)
             yield
         finally:
-            self.set_property(prop, _preserved_value)
+            self.set_flag(flag, _preserved_value)
 
-    def get_property(self, prop, default=None):
-        return self._properties.get(prop, default)
+    def set_flag(self, flag, value=True):
+        self.properties[flag] = value
 
-    def set_property(self, prop, value=1):
-        self._properties[prop] = value
+    def is_flag_set(self, flag, default=False):
+        return self.properties.get(flag, default)
+
+    # Just an implementation detail that they both share
+    # the same internal structure.
+    get_property = is_flag_set
+    set_property = set_flag
+    temp_property = temp_flag
 
     def compile(self, key, value):
         self.pointer = protected_name(key, prefix=False)
@@ -72,8 +78,8 @@ class CompilerState:
 
     def get_ordered_parents(self):
         parents = self.parents + [self]
-        enumeration_start = self.get_property("enumeration_start")
-        if not enumeration_start:
+        enumeration_start = self.get_property("enumeration start depth")
+        if enumeration_start is None:
             return parents
 
         for index, parent in enumerate(parents):
@@ -85,12 +91,19 @@ class CompilerState:
             )
         return parents[index:]
 
+    def as_unique_ref(self, prefix):
+        return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+    @property
+    def can_raw_name_access(self):
+        return self.is_flag_set("in for loop")
+
 
 def generate_type_checked_key(state):
     base = None
     for parent in state.get_ordered_parents():
         if base is None:
-            if state.get_property("enumeration_start") is not None:
+            if state.can_raw_name_access:
                 base = parent.pointer
             else:
                 base = EdgeQLFilterKey(parent.pointer)
@@ -186,12 +199,12 @@ def compile_sequence(node, state):
     ):
         return length_verifier
 
-    array_ref = f"_items_{id(state)}_{state.depth}"
+    array_ref = state.as_unique_ref("_sequence")
 
     # If we are in a nested list search (e.g: Call(args=[Call(args=[Name()])]))
     # we can't directly use `ORDER BY @index` since the EdgeDB can't quite infer
-    # which @index are we talking about:
-    if state.get_property("enumeration_start") is not None:
+    # which @index are we talking about.
+    if state.is_flag_set("in for loop"):
         original_matcher = generate_type_checked_key(state.parents[-1])
         type_checked_sequence = EdgeQLAttribute(
             type_check(
@@ -211,27 +224,31 @@ def compile_sequence(node, state):
         unpacked_list = EdgeQLSelect(
             generate_type_checked_key(state), ordered=EdgeQLProperty("index")
         )
+
     unpacked_array = EdgeQLCall("array_agg", [unpacked_list])
     scope = EdgeQLWithBlock({array_ref: unpacked_array})
 
-    filters = None
-    for position, matcher in enumerate(node.items):
-        if matcher is ReizQLIgnore:
-            continue
-        elif not isinstance(matcher, ReizQLMatch):
-            # FIX-ME(high): support for logical operations + enums
-            # Call(args = [Name('bruh') | Attribute(attr='moment')])
-            raise ReizQLSyntaxError(
-                "A list may only contain matchers, not atoms"
-            )
+    with state.temp_flag("in for loop"), state.temp_property(
+        "enumeration start depth", state.depth
+    ):
+        filters = None
+        for position, matcher in enumerate(node.items):
+            if matcher is ReizQLIgnore:
+                continue
+            elif not isinstance(matcher, ReizQLMatch):
+                # FIX-ME(high): support for logical operations + enums
+                # Call(args = [Name('bruh') | Attribute(attr='moment')])
+                raise ReizQLSyntaxError(
+                    "A list may only contain matchers, not atoms"
+                )
 
-        with state.temp_pointer(
-            EdgeQLSubscript(EdgeQLName(array_ref), position)
-        ), state.temp_property("enumeration_start", state.depth):
-            filters = merge_filters(filters, codegen(matcher, state))
+            with state.temp_pointer(
+                EdgeQLSubscript(EdgeQLName(array_ref), position)
+            ):
+                filters = merge_filters(filters, codegen(matcher, state))
 
-    assert filters is not None
-    object_verifier = EdgeQLSelect(filters, with_block=scope)
+        assert filters is not None
+        object_verifier = EdgeQLSelect(filters, with_block=scope)
 
     return merge_filters(length_verifier, object_verifier)
 
@@ -261,7 +278,7 @@ _BUILTIN_FUNC_SIGNATURES = {
 
 def convert_all_any(node, state, arguments):
     query = construct(codegen(arguments.value, state))
-    return EdgeQLCall(node.name.lower(), [query])
+    return as_edgeql_filter_expr(EdgeQLCall(node.name.lower(), [query]))
 
 
 @codegen.register(ReizQLBuiltin)

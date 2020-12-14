@@ -14,7 +14,6 @@ from reiz.edgeql.base import (
     with_parens,
 )
 from reiz.edgeql.expr import (
-    EdgeQLCall,
     EdgeQLComparisonOperator,
     EdgeQLFilterKey,
     EdgeQLLogicOperator,
@@ -91,15 +90,19 @@ class EdgeQLFilterChain(EdgeQLComponent):
 
 
 EdgeQLFilterType = (EdgeQLFilter, EdgeQLFilterChain)
+_FILTER_EXPR_MARK = "_returns_bool"
+
+
+def as_edgeql_filter_expr(expr):
+    setattr(expr, _FILTER_EXPR_MARK, True)
+    return expr
 
 
 def is_edgeql_filter_expr(expr):
     if isinstance(expr, EdgeQLFilterType):
         return True
-    elif isinstance(expr, EdgeQLCall) and expr.func in {"all", "any"}:
-        return True
     else:
-        return False
+        return getattr(expr, _FILTER_EXPR_MARK, False)
 
 
 def make_filter(**kwargs):
@@ -142,6 +145,15 @@ class EdgeQLVerify(EdgeQLComponent):
         query = construct(self.query)
         check = construct(self.operator) + " " + construct(self.argument)
         return query + with_parens(check, combo="[]")
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLCoalesce(EdgeQLStatement):
+    value: EdgeQLObject
+    option: EdgeQLObject
+
+    def construct(self):
+        return construct(self.value) + " ?? " + construct(self.option)
 
 
 @dataclass(unsafe_hash=True)
