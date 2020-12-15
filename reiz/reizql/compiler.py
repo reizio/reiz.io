@@ -191,14 +191,22 @@ def convert_logical_operator(node, state):
 
 @codegen.register(ReizQLList)
 def compile_sequence(node, state):
+    total_length = len(node.items)
     length_verifier = EdgeQLFilter(
         EdgeQLCall("count", [generate_type_checked_key(state)]),
-        len(node.items),
+        total_length,
     )
-    if len(node.items) == 0 or all(
-        item is ReizQLIgnore for item in node.items
-    ):
+    if total_length == 0 or all(  # Empty list
+        item in (ReizQLIgnore, ReizQLExpand) for item in node.items
+    ):  # Length matching
         return length_verifier
+
+    if total := node.items.count(ReizQLExpand):
+        if total > 1:
+            raise ReizQLSyntaxError(
+                "Can't use multiple expansion macros in one sequence"
+            )
+        length_verifier.operator = EdgeQLComparisonOperator.GTE
 
     array_ref = state.as_unique_ref("_sequence")
 
@@ -229,6 +237,7 @@ def compile_sequence(node, state):
     unpacked_array = EdgeQLCall("array_agg", [unpacked_list])
     scope = EdgeQLWithBlock({array_ref: unpacked_array})
 
+    expansion_seen = False
     with state.temp_flag("in for loop"), state.temp_property(
         "enumeration start depth", state.depth
     ):
@@ -236,12 +245,18 @@ def compile_sequence(node, state):
         for position, matcher in enumerate(node.items):
             if matcher is ReizQLIgnore:
                 continue
+            elif matcher is ReizQLExpand:
+                expansion_seen = True
+                continue
             elif not isinstance(matcher, ReizQLMatch):
                 # FIX-ME(high): support for logical operations + enums
                 # Call(args = [Name('bruh') | Attribute(attr='moment')])
                 raise ReizQLSyntaxError(
                     "A list may only contain matchers, not atoms"
                 )
+
+            if expansion_seen:
+                position = -(total_length - position)
 
             with state.temp_pointer(
                 EdgeQLSubscript(EdgeQLName(array_ref), position)

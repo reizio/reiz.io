@@ -89,7 +89,7 @@ they might be list adapters, which means that both type and value is checked
 `Constant(1)` or `FunctionDef('foo')`)
 ```
 filter := matcher
-        | '[' filter* ']'
+        | '[' (filter|expand)* ']'
         | ignore
         | or_filter
         | negated
@@ -105,6 +105,16 @@ or not, you can basically query this `FunctionDef(body=[..., ..., Return()])`.
 
 ```
 ignore := '...'
+```
+
+### Expand
+Expand is like "The Ignore", a pseudo operator that allows you to operate
+on a list where you don't know the total length but you know the positions
+of items, like `Call(args=[Name(), *..., Name(), ...])` would match a list
+where the first, and second from the last items are `Name()` nodes.
+
+```
+expand := '*' ignore
 ```
 
 ### Boolean Logic

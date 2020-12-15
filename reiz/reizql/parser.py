@@ -6,6 +6,7 @@ from reiz.reizql.nodes import (
     ReizQLAttr,
     ReizQLBuiltin,
     ReizQLConstant,
+    ReizQLExpand,
     ReizQLIgnore,
     ReizQLList,
     ReizQLLogicalOperation,
@@ -155,6 +156,18 @@ def parse_unary(node):
         return ReizQLAttr(node.operand.id)
     else:
         raise ReizQLSyntaxError.from_node(node, "unknown unary operator")
+
+
+@parse.register(ast.Starred)
+def parse_starred(node):
+    ensure(
+        (
+            isinstance(node.value, ast.Constant)
+            and node.value.value is Ellipsis
+        ),
+        node,
+    )
+    return ReizQLExpand
 
 
 def parse_query(source):
