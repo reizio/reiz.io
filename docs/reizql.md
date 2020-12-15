@@ -92,6 +92,7 @@ filter := matcher
         | '[' (filter|expand)* ']'
         | ignore
         | or_filter
+        | and_filter
         | negated
         | attribute
         | ATOM
@@ -118,12 +119,18 @@ expand := '*' ignore
 ```
 
 ### Boolean Logic
-We have a limited support for `OR` gates, such as `Constant(1 | 2)`.
+We have a limited support for `AND` / `OR` gates, such as `Constant(1 | 2)`.
 Even though the syntax allows it, the generated queries take so long
 to execute when used with other matchers like `Call(Name() | Attribute())`.
 It is on our task list to optimize, and probably will come with Alpha 2.
+
+
+One cool usage of `AND` gates is, setting the possible length range, such
+as `Call(args=[*..., Name()] & LEN(min=5, max=8)])`.
+
 ```
 or_filter := filter "|" filter
+and_filter := filter "&" filter
 ```
 
 ### Negativity

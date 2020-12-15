@@ -187,6 +187,8 @@ def convert_logical_operation(node, state):
 def convert_logical_operator(node, state):
     if node is ReizQLLogicOperator.OR:
         return EdgeQLLogicOperator.OR
+    elif node is ReizQLLogicOperator.AND:
+        return EdgeQLLogicOperator.AND
 
 
 @codegen.register(ReizQLList)

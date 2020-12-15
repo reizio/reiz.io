@@ -117,6 +117,8 @@ def parse_call(node):
 def parse_binop(node):
     if isinstance(node.op, ast.BitOr):
         operator = ReizQLLogicOperator.OR
+    elif isinstance(node.op, ast.BitAnd):
+        operator = ReizQLLogicOperator.AND
     else:
         raise ReizQLSyntaxError.from_node(
             node.op, f"Unknown logical operation: {type(node.op).__name__}"

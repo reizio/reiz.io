@@ -33,6 +33,7 @@ class ReizQLExpand(ReizQLExpression):
 @ReizQLObject.register
 class ReizQLLogicOperator(ReizEnum, IntEnum):
     OR = auto()
+    AND = auto()
 
 
 @dataclass(unsafe_hash=True)
