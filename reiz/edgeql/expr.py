@@ -38,15 +38,29 @@ class EdgeQLComparisonOperator(ReizEnum):
     NOT_EQUALS = "!="
     NOT_CONTAINS = "NOT IN"
     NOT_IDENTICAL = "IS NOT"
+    GT = ">"
+    LT = "<"
+    GTE = ">="
+    LTE = "<="
 
     def construct(self):
         return self.value
 
     def negate(self):
-        if self.name.startswith("NOT_"):
+        if self.name in {"GT", "LT", "GTE", "LTE"}:
+            return _NEGATIVE_COMPARISON_OPERATORS[self]
+        elif self.name.startswith("NOT_"):
             return getattr(self, self.name[4:])
         else:
             return getattr(self, f"NOT_{self.name}")
+
+
+_NEGATIVE_COMPARISON_OPERATORS = {
+    EdgeQLComparisonOperator.GT: EdgeQLComparisonOperator.LTE,
+    EdgeQLComparisonOperator.LT: EdgeQLComparisonOperator.GTE,
+    EdgeQLComparisonOperator.GTE: EdgeQLComparisonOperator.LT,
+    EdgeQLComparisonOperator.LTE: EdgeQLComparisonOperator.GT,
+}
 
 
 @dataclass(unsafe_hash=True)

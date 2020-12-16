@@ -6,6 +6,7 @@ from reiz.reizql.nodes import (
     ReizQLAttr,
     ReizQLBuiltin,
     ReizQLConstant,
+    ReizQLExpand,
     ReizQLIgnore,
     ReizQLList,
     ReizQLLogicalOperation,
@@ -16,7 +17,7 @@ from reiz.reizql.nodes import (
     ReizQLSet,
 )
 
-BUILTIN_FUNCTIONS = ("ALL", "ANY")
+BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN")
 POSITION_ATTRIBUTES = frozenset(
     ("lineno", "col_offset", "end_lineno", "end_col_offset")
 )
@@ -79,7 +80,7 @@ def parse_call(node):
         return ReizQLBuiltin(
             name,
             [parse(arg) for arg in node.args],
-            {keyword: parse(keyword) for keyword in node.keywords},
+            {keyword.arg: parse(keyword.value) for keyword in node.keywords},
         )
 
     origin = getattr(ast, name)
@@ -116,6 +117,8 @@ def parse_call(node):
 def parse_binop(node):
     if isinstance(node.op, ast.BitOr):
         operator = ReizQLLogicOperator.OR
+    elif isinstance(node.op, ast.BitAnd):
+        operator = ReizQLLogicOperator.AND
     else:
         raise ReizQLSyntaxError.from_node(
             node.op, f"Unknown logical operation: {type(node.op).__name__}"
@@ -133,7 +136,7 @@ def parse_constant(node):
     if node.value is Ellipsis:
         return ReizQLIgnore
     else:
-        return ReizQLConstant(repr(str(node.value)))
+        return ReizQLConstant(repr(node.value))
 
 
 @parse.register(ast.List)
@@ -155,6 +158,18 @@ def parse_unary(node):
         return ReizQLAttr(node.operand.id)
     else:
         raise ReizQLSyntaxError.from_node(node, "unknown unary operator")
+
+
+@parse.register(ast.Starred)
+def parse_starred(node):
+    ensure(
+        (
+            isinstance(node.value, ast.Constant)
+            and node.value.value is Ellipsis
+        ),
+        node,
+    )
+    return ReizQLExpand
 
 
 def parse_query(source):

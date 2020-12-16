@@ -1,313 +1,373 @@
-import functools
+from __future__ import annotations
+
+import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from functools import singledispatch
+from types import SimpleNamespace
+from typing import Any, ClassVar, Dict, List, Optional
 
 from reiz.db.schema import protected_name
-from reiz.edgeql import (
-    EdgeQLAttribute,
-    EdgeQLCall,
-    EdgeQLCast,
-    EdgeQLComparisonOperator,
-    EdgeQLFilter,
-    EdgeQLFilterChain,
-    EdgeQLFilterKey,
-    EdgeQLFilterType,
-    EdgeQLFor,
-    EdgeQLLogicOperator,
-    EdgeQLName,
-    EdgeQLNot,
-    EdgeQLObject,
-    EdgeQLPreparedQuery,
-    EdgeQLProperty,
-    EdgeQLSelect,
-    EdgeQLSet,
-    EdgeQLVerify,
-    EdgeQLVerifyOperator,
-    EdgeQLWithBlock,
-    merge_filters,
-    unpack_filters,
-)
-from reiz.reizql.nodes import (
-    ReizQLAttr,
-    ReizQLBuiltin,
-    ReizQLConstant,
-    ReizQLIgnore,
-    ReizQLList,
-    ReizQLLogicalOperation,
-    ReizQLLogicOperator,
-    ReizQLMatch,
-    ReizQLMatchEnum,
-    ReizQLNot,
-    ReizQLSet,
-)
+from reiz.edgeql import *
+from reiz.reizql.nodes import *
 from reiz.reizql.parser import ReizQLSyntaxError
-from reiz.utilities import logger
 
-__DEFAULT_FOR_TARGET = "__KEY"
+_COMPILER_WORKAROUND_FOR_TARGET = "_singleton"
 
 
 @dataclass(unsafe_hash=True)
-class SelectState:
-    name: str
+class CompilerState:
+    match: str
     depth: int = 0
     pointer: Optional[str] = None
-    assignments: Dict[str, EdgeQLObject] = field(default_factory=dict)
+    parents: List[CompilerState] = field(default_factory=list)
+
+    # hand properties store data (like 'enumeration start depth')
+    properties: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_parent(cls, name, parent):
+        return cls(
+            name,
+            depth=parent.depth + 1,
+            parents=parent.parents + [parent],
+            properties=parent.properties,
+        )
+
+    @property
+    def is_root(self):
+        return self.depth == 0
+
+    @contextmanager
+    def temp_pointer(self, pointer):
+        _old_pointer = self.pointer
+        try:
+            self.pointer = pointer
+            yield
+        finally:
+            self.pointer = _old_pointer
+
+    @contextmanager
+    def temp_flag(self, flag, value=True):
+        _preserved_value = self.is_flag_set(flag)
+        try:
+            self.set_flag(flag, value)
+            yield
+        finally:
+            self.set_flag(flag, _preserved_value)
+
+    def set_flag(self, flag, value=True):
+        self.properties[flag] = value
+
+    def is_flag_set(self, flag, default=False):
+        return self.properties.get(flag, default)
+
+    # Just an implementation detail that they both share
+    # the same internal structure.
+    get_property = is_flag_set
+    set_property = set_flag
+    temp_property = temp_flag
+
+    def compile(self, key, value):
+        self.pointer = protected_name(key, prefix=False)
+        return self.as_query(codegen(value, self))
+
+    def as_query(self, query):
+        if not is_edgeql_filter_expr(real_object(query)):
+            query = EdgeQLFilter(generate_type_checked_key(self), query)
+        return query
+
+    def get_ordered_parents(self):
+        parents = self.parents + [self]
+        enumeration_start = self.get_property("enumeration start depth")
+        if enumeration_start is None:
+            return parents
+
+        for index, parent in enumerate(parents):
+            if parent.depth == enumeration_start:
+                break
+        else:
+            raise ValueError(
+                "Compiler check failed: no enumeration start block found!"
+            )
+        return parents[index:]
+
+    def as_unique_ref(self, prefix):
+        return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+    @property
+    def can_raw_name_access(self):
+        return self.is_flag_set("in for loop")
 
 
-@functools.singledispatch
-def compile_edgeql(obj, state):
-    raise ReizQLSyntaxError(f"Unexpected query object: {obj!r}")
+def generate_type_checked_key(state):
+    base = None
+    for parent in state.get_ordered_parents():
+        if base is None:
+            if state.can_raw_name_access:
+                base = parent.pointer
+            else:
+                base = EdgeQLFilterKey(parent.pointer)
+        else:
+            base = EdgeQLAttribute(
+                type_check(base, parent.match), parent.pointer
+            )
+    return base
 
 
-@compile_edgeql.register(ReizQLMatch)
-def convert_match(node, state=None):
-    query = None
-    state = SelectState(node.name)
+def type_check(key, expected_type, inline=True):
+    if inline:
+        constructor = EdgeQLVerify
+        operator = EdgeQLVerifyOperator.IS
+    else:
+        constructor = EdgeQLFilter
+        operator = EdgeQLComparisonOperator.IDENTICAL
+    return constructor(
+        key, protected_name(expected_type, prefix=True), operator
+    )
+
+
+@singledispatch
+def codegen(node, state):
+    raise ValueError(f"Unknown node: {type(node).__name__}")
+
+
+@codegen.register(ReizQLMatch)
+def compile_matcher(node, state):
+    if state is None:
+        state = CompilerState(node.name)
+    else:
+        state = CompilerState.from_parent(node.name, state)
+
+    filters = None
     for key, value in node.filters.items():
-        state.pointer = protected_name(key, prefix=False)
         if value is ReizQLIgnore:
             continue
+        filters = merge_filters(filters, state.compile(key, value))
 
-        conversion = compile_edgeql(value, state)
-
-        if not isinstance(conversion, EdgeQLFilterType):
-            conversion = EdgeQLFilter(
-                EdgeQLFilterKey(state.pointer), conversion
-            )
-
-        query = merge_filters(query, conversion)
-
-    params = {"filters": query}
-    if state.assignments:
-        params["with_block"] = EdgeQLWithBlock(state.assignments)
-    return EdgeQLSelect(state.name, **params)
+    if state.is_root:
+        return EdgeQLSelect(state.match, filters=filters)
+    else:
+        if filters is None:
+            key = generate_type_checked_key(state.parents[-1])
+            filters = type_check(key, state.match, inline=False)
+        return filters
 
 
-@compile_edgeql.register(ReizQLMatchEnum)
+@codegen.register(ReizQLMatchEnum)
 def convert_match_enum(node, state):
     return EdgeQLCast(protected_name(node.base, prefix=True), repr(node.name))
 
 
-@compile_edgeql.register(ReizQLLogicalOperation)
+@codegen.register(ReizQLConstant)
+def compile_constant(node, state):
+    return EdgeQLPreparedQuery(str(node.value))
+
+
+@codegen.register(ReizQLNot)
+def compile_operator_flip(node, state):
+    filters = state.as_query(codegen(node.value, state))
+    return EdgeQLGroup(EdgeQLNot(EdgeQLGroup(filters)))
+
+
+@codegen.register(ReizQLAttr)
+def convert_attr(node, state):
+    with state.temp_pointer(node.attr):
+        return generate_type_checked_key(state)
+
+
+@codegen.register(ReizQLLogicalOperation)
 def convert_logical_operation(node, state):
-    left = compile_edgeql(node.left, state)
-    right = compile_edgeql(node.right, state)
-
-    if not isinstance(left, EdgeQLFilterChain):
-        left = EdgeQLFilter(EdgeQLFilterKey(state.pointer), left)
-    if not isinstance(right, EdgeQLFilterChain):
-        right = EdgeQLFilter(EdgeQLFilterKey(state.pointer), right)
-    return EdgeQLFilterChain(left, right, compile_edgeql(node.operator, state))
+    left = state.as_query(codegen(node.left, state))
+    right = state.as_query(codegen(node.right, state))
+    return EdgeQLFilterChain(left, right, codegen(node.operator, state))
 
 
-@compile_edgeql.register(ReizQLLogicOperator)
+@codegen.register(ReizQLLogicOperator)
 def convert_logical_operator(node, state):
     if node is ReizQLLogicOperator.OR:
         return EdgeQLLogicOperator.OR
+    elif node is ReizQLLogicOperator.AND:
+        return EdgeQLLogicOperator.AND
 
 
-@compile_edgeql.register(ReizQLSet)
-def convert_set(node, state):
-    return EdgeQLSet([compile_edgeql(item, state) for item in node.items])
-
-
-def generate_typechecked_query_item(query, base):
-    rec_list = False
-    if isinstance(query.key, EdgeQLCall) and isinstance(
-        query.key.args[0], EdgeQLFilterKey
-    ):
-        name = query.key.args[0].name
-        rec_list = True
-    elif isinstance(query.key, EdgeQLFilterKey):
-        name = query.key.name
-    else:
-        raise ReizQLSyntaxError(
-            f"Unknown matcher type for list expression: {type(query).__name__}"
-        )
-
-    key = EdgeQLAttribute(base, name)
-
-    if rec_list:
-        query.key.args[0] = key
-        return query
-    elif isinstance(query.value, EdgeQLPreparedQuery):
-        query.key = key
-        return query
-    elif isinstance(query.value, EdgeQLSelect):
-        model = protected_name(query.value.name, prefix=True)
-        verifier = EdgeQLVerify(key, EdgeQLVerifyOperator.IS, model)
-        if query.value.filters:
-            return generate_typechecked_query(query.value.filters, verifier)
-        else:
-            return EdgeQLFilter(
-                EdgeQLAttribute(base, query.key.name),
-                model,
-                EdgeQLComparisonOperator.IDENTICAL,
-            )
-    else:
-        raise ReizQLSyntaxError("Unsupported syntax")
-
-
-def generate_typechecked_selection(selection, base):
-    def replace_select(node):
-        assert isinstance(node.name, EdgeQLFilterKey)
-        node.name = EdgeQLAttribute(f"_tmp_singleton", node.name.name)
-        return EdgeQLFor("_tmp_singleton", EdgeQLSet([base]), node)
-
-    def replace_node(node):
-        if isinstance(node, EdgeQLVerify):
-            node.query = replace_select(node.query)
-        elif isinstance(node, EdgeQLSelect):
-            return replace_select(node)
-        else:
-            logger.warning("Unhandled type: %s", type(node).__name__)
-        return node
-
-    if selection.with_block:
-        namespace = selection.with_block.assignments
-        for key, node in namespace.copy().items():
-            namespace[key] = replace_node(node)
-
-    return selection
-
-
-def generate_typechecked_query(filters, base):
-    base_query = None
-    for query, operator in unpack_filters(filters):
-        if isinstance(query, EdgeQLSelect):
-            current_query = generate_typechecked_selection(query, base)
-        elif isinstance(query, EdgeQLFilter):
-            current_query = generate_typechecked_query_item(query, base)
-        else:
-            raise ReizQLSyntaxError("Unsupported syntax")
-
-        base_query = merge_filters(base_query, current_query, operator)
-
-    return base_query
-
-
-def convert_any_all(node, state):
-    if len(node.args) != 1 or node.keywords:
-        raise ReizQLSyntaxError(
-            f"Parameter mismatch for built-in function: {node.name!r}"
-        )
-
-    check = compile_edgeql(*node.args, state)
-    negated = isinstance(check, EdgeQLNot)
-    if negated:
-        check = check.value
-
-    if isinstance(check, EdgeQLSelect) and check.filters:
-        operator = EdgeQLComparisonOperator.EQUALS
-    elif isinstance(check, EdgeQLSelect) and not check.filters:
-        check = protected_name(check.name, prefix=True)
-        operator = EdgeQLComparisonOperator.IDENTICAL
-    else:
-        raise ReizQLSyntaxError(
-            "Unsupported operation passed into built-in function"
-        )
-
-    if negated:
-        operator = operator.negate()
-
-    return EdgeQLFilter(
-        EdgeQLCall(
-            node.name.lower(),
-            [EdgeQLFilter(EdgeQLFilterKey(state.pointer), check, operator)],
-        ),
-        EdgeQLPreparedQuery("True"),
+@codegen.register(ReizQLList)
+def compile_sequence(node, state):
+    total_length = len(node.items)
+    length_verifier = EdgeQLFilter(
+        EdgeQLCall("count", [generate_type_checked_key(state)]),
+        total_length,
     )
+    if total_length == 0 or all(  # Empty list
+        item in (ReizQLIgnore, ReizQLExpand) for item in node.items
+    ):  # Length matching
+        return length_verifier
 
-
-@compile_edgeql.register(ReizQLBuiltin)
-def convert_builtin(node, state):
-    if node.name in ("ANY", "ALL"):
-        return convert_any_all(node, state)
-
-
-@compile_edgeql.register(ReizQLNot)
-def convert_negatation(node, state):
-    return EdgeQLNot(compile_edgeql(node.value, state))
-
-
-@compile_edgeql.register(ReizQLList)
-def convert_list(node, state):
-    object_verifier = EdgeQLFilter(
-        EdgeQLCall("count", [EdgeQLFilterKey(state.pointer)]), len(node.items)
-    )
-    if len(node.items) == 0 or all(
-        item is ReizQLIgnore for item in node.items
-    ):
-        return object_verifier
-
-    assignments = {}
-    select_filters = None
-    for index, item in enumerate(node.items):
-        if item is ReizQLIgnore:
-            continue
-        elif not isinstance(item, ReizQLMatch):
+    if total := node.items.count(ReizQLExpand):
+        if total > 1:
             raise ReizQLSyntaxError(
-                "A list may only contain matchers, not atoms"
+                "Can't use multiple expansion macros in one sequence"
             )
+        length_verifier.operator = EdgeQLComparisonOperator.GTE
 
-        selection = EdgeQLSelect(
-            EdgeQLFilterKey(state.pointer),
-            ordered=EdgeQLProperty("index"),
-            offset=index,
-            limit=1,
+    array_ref = state.as_unique_ref("_sequence")
+
+    # If we are in a nested list search (e.g: Call(args=[Call(args=[Name()])]))
+    # we can't directly use `ORDER BY @index` since the EdgeDB can't quite infer
+    # which @index are we talking about.
+    if state.is_flag_set("in for loop"):
+        original_matcher = generate_type_checked_key(state.parents[-1])
+        type_checked_sequence = EdgeQLAttribute(
+            type_check(
+                EdgeQLName(_COMPILER_WORKAROUND_FOR_TARGET), state.match
+            ),
+            state.pointer,
         )
-        filters = convert_match(item).filters
-
-        # If there are no value queries, only type-check
-        name = f"__item_{index}_{id(filters)}"
-        if filters is None:
-            assignments[name] = selection
-            select_filters = merge_filters(
-                select_filters,
-                EdgeQLFilter(
-                    EdgeQLName(name),
-                    protected_name(item.name, prefix=True),
-                    EdgeQLComparisonOperator.IDENTICAL,
-                ),
-            )
-        else:
-            assignments[name] = EdgeQLVerify(
-                selection,
-                EdgeQLVerifyOperator.IS,
-                protected_name(item.name, prefix=True),
-            )
-            select_filters = merge_filters(
-                select_filters,
-                generate_typechecked_query(filters, name),
-            )
-
-    if assignments:
-        with_block = EdgeQLWithBlock(assignments)
+        unpacked_list = EdgeQLFor(
+            _COMPILER_WORKAROUND_FOR_TARGET,
+            EdgeQLSet([original_matcher]),
+            EdgeQLSelect(
+                type_checked_sequence,
+                ordered=EdgeQLProperty("index"),
+            ),
+        )
     else:
-        with_block = None
+        unpacked_list = EdgeQLSelect(
+            generate_type_checked_key(state), ordered=EdgeQLProperty("index")
+        )
 
-    value_verifier = EdgeQLSelect(
-        select_filters,
-        with_block=with_block,
-    )
-    return EdgeQLFilterChain(
-        object_verifier,
-        value_verifier,
-    )
+    unpacked_array = EdgeQLCall("array_agg", [unpacked_list])
+    scope = EdgeQLWithBlock({array_ref: unpacked_array})
 
-
-@compile_edgeql.register(ReizQLConstant)
-def convert_atomic(node, state):
-    if (
-        state.name == "Dict"
-        and state.pointer == "keys"
-        and str(node.value) == repr(str(None))
+    expansion_seen = False
+    with state.temp_flag("in for loop"), state.temp_property(
+        "enumeration start depth", state.depth
     ):
-        return compile_edgeql(ReizQLMatch("Sentinel"))
-    else:
-        return EdgeQLPreparedQuery(str(node.value))
+        filters = None
+        for position, matcher in enumerate(node.items):
+            if matcher is ReizQLIgnore:
+                continue
+            elif matcher is ReizQLExpand:
+                expansion_seen = True
+                continue
+            elif not isinstance(matcher, ReizQLMatch):
+                # FIX-ME(high): support for logical operations + enums
+                # Call(args = [Name('bruh') | Attribute(attr='moment')])
+                raise ReizQLSyntaxError(
+                    "A list may only contain matchers, not atoms"
+                )
+
+            if expansion_seen:
+                position = -(total_length - position)
+
+            with state.temp_pointer(
+                EdgeQLSubscript(EdgeQLName(array_ref), position)
+            ):
+                filters = merge_filters(filters, codegen(matcher, state))
+
+        assert filters is not None
+        object_verifier = EdgeQLSelect(filters, with_block=scope)
+
+    return merge_filters(length_verifier, object_verifier)
 
 
-@compile_edgeql.register(ReizQLAttr)
-def convert_attr(node, state):
-    return EdgeQLFilterKey(node.attr)
+@dataclass
+class Signature:
+    name: str
+    func: Callable
+    params: List[str] = field(default_factory=set)
+    defaults: Dict[str, Any] = field(default_factory=list)
+
+    _FUNCTIONS: ClassVar[Dict[str, Callable]] = {}
+
+    @classmethod
+    def register(cls, name, *args, **kwargs):
+        def wrapper(func):
+            cls._FUNCTIONS[name] = cls(name, func, *args, **kwargs)
+            return func
+
+        return wrapper
+
+    def codegen(self, node, state):
+        return self.func(node, state, self.bind(node))
+
+    def bind(self, node):
+        bound_args = {}
+        params = self.params.copy()
+        for argument in node.args:
+            if len(params) == 0:
+                raise ReizQLSyntaxError(
+                    f"{self.name!r} got too many positional arguments"
+                )
+            bound_args[params.pop(0)] = argument
+
+        for keyword, value in node.keywords.items():
+            if keyword not in params:
+                raise ReizQLSyntaxError(
+                    f"{self.name!r} got an unexpected keyword argument {keyword!r}"
+                )
+            params.remove(keyword)
+            bound_args[keyword] = value
+
+        for param in params.copy():
+            if param not in self.defaults:
+                raise ReizQLSyntaxError(
+                    f"{self.name!r} requires {param!r} argument"
+                )
+            bound_args[param] = self.defaults[param]
+
+        return SimpleNamespace(**bound_args)
+
+
+def builtin_type_error(func, expected):
+    raise ReizQLSyntaxError(f"{func!r} expects {expected}")
+
+
+@Signature.register("ALL", ["value"])
+@Signature.register("ANY", ["value"])
+def convert_all_any(node, state, arguments):
+    query = construct(codegen(arguments.value, state))
+    return as_edgeql_filter_expr(EdgeQLCall(node.name.lower(), [query]))
+
+
+@Signature.register("LEN", ["min", "max"], {"min": None, "max": None})
+def convert_length(node, state, arguments):
+    if arguments.min is None and arguments.max is None:
+        raise ReizQLSyntaxError("'LEN' requires at least 1 argument")
+
+    count = EdgeQLCall("count", [generate_type_checked_key(state)])
+    filters = None
+    for value, operator in [
+        (arguments.min, EdgeQLComparisonOperator.GTE),
+        (arguments.max, EdgeQLComparisonOperator.LTE),
+    ]:
+        if value is None:
+            continue
+
+        if not (isinstance(value, ReizQLConstant) and value.value.isdigit()):
+            builtin_type_error("LEN", "integers")
+
+        try:
+            value = str(int(value.value))
+        except ValueError:
+            builtin_type_error("LEN", "integers")
+
+        filters = merge_filters(
+            filters, EdgeQLFilter(count, EdgeQLPreparedQuery(value), operator)
+        )
+
+    assert filters is not None
+    return filters
+
+
+@codegen.register(ReizQLBuiltin)
+def convert_call(node, state):
+    signature = Signature._FUNCTIONS.get(node.name)
+    if signature is None:
+        raise ValueError("Compiler check failed: unknown builtin function!")
+
+    return signature.codegen(node, state)
+
+
+def compile_edgeql(node):
+    return codegen(node, None)
