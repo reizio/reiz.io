@@ -3,7 +3,6 @@ import tokenize
 
 from reiz.config import config
 from reiz.database import get_new_connection
-from reiz.db.schema import protected_name
 from reiz.edgeql import (
     EdgeQLCall,
     EdgeQLSelect,
@@ -11,6 +10,7 @@ from reiz.edgeql import (
     EdgeQLUnion,
     as_edgeql,
 )
+from reiz.edgeql.schema import protected_name
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
 from reiz.utilities import logger
 

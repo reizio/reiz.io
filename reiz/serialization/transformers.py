@@ -1,6 +1,6 @@
 import ast
 
-from reiz.db.schema import MODULE_ANNOTATED_TYPES
+from reiz.edgeql.schema import MODULE_ANNOTATED_TYPES
 
 
 def iter_attributes(node):

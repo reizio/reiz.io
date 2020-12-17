@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Union
 
-from reiz.db.schema import protected_name
 from reiz.edgeql.base import (
     EdgeQLExpression,
     EdgeQLObject,
@@ -19,6 +18,7 @@ from reiz.edgeql.expr import (
     EdgeQLLogicOperator,
     EdgeQLVerifyOperator,
 )
+from reiz.edgeql.schema import protected_name
 
 
 class EdgeQLComponent(EdgeQLObject):

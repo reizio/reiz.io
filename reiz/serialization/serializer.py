@@ -4,12 +4,6 @@ import tokenize
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from reiz.db.schema import (
-    ATOMIC_TYPES,
-    ENUM_TYPES,
-    MODULE_ANNOTATED_TYPES,
-    protected_name,
-)
 from reiz.edgeql import (
     EdgeQLCall,
     EdgeQLCast,
@@ -25,6 +19,12 @@ from reiz.edgeql import (
     EdgeQLVariable,
     as_edgeql,
     make_filter,
+)
+from reiz.edgeql.schema import (
+    ATOMIC_TYPES,
+    ENUM_TYPES,
+    MODULE_ANNOTATED_TYPES,
+    protected_name,
 )
 from reiz.serialization.transformers import (
     QLAst,

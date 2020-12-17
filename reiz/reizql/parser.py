@@ -1,7 +1,7 @@
 import ast
 import functools
 
-from reiz.db.schema import ENUM_TYPES
+from reiz.edgeql.schema import ENUM_TYPES
 from reiz.reizql.nodes import (
     ReizQLAttr,
     ReizQLBuiltin,
