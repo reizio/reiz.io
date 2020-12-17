@@ -2,7 +2,7 @@ import ast
 import functools
 import tokenize
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from reiz.db.schema import (
     ATOMIC_TYPES,
@@ -32,11 +32,12 @@ from reiz.serialization.transformers import (
     infer_base,
     iter_attributes,
 )
-from reiz.utilities import logger
+from reiz.utilities import guarded, logger
 
 
 @dataclass(unsafe_hash=True)
 class QLState:
+    fields: Dict[str, Any] = field(default_factory=dict)
     from_parent: Optional[ast.AST] = None
     reference_pool: List[str] = field(default_factory=list)
 
@@ -103,21 +104,34 @@ def insert(connection, ql_state, node):
     for field, value in (*ast.iter_fields(node), *iter_attributes(node)):
         if value is None:
             continue
-        insertions[field] = serialize(value, ql_state, connection)
+        elif field in ql_state.fields:
+            insertions[field] = ql_state.fields[field]
+        else:
+            insertions[field] = serialize(value, ql_state, connection)
+
     query = as_edgeql(EdgeQLInsert(node_type, insertions))
     logger.trace("Running query: %r", query)
     return connection.query_one(query)
 
 
-# FIX-ME(low): remove <rawdata>/<provider> prefix
-def insert_file(connection, file):
+def insert_project_metadata(connection, instance):
+    ql_state = QLState()
+    project = ast.project(
+        instance.name, instance.git_source, instance.git_revision
+    )
+    return serialize(project, ql_state, connection)
+
+
+@guarded
+def insert_file(connection, file, filename, project_ref):
     with tokenize.open(file) as file_p:
         source = file_p.read()
 
     tree = QLAst.visit(ast.parse(source))
-    tree.filename = str(file)
+    tree.filename = filename
+    tree.project = ...
 
-    ql_state = QLState()
+    ql_state = QLState(fields={"project": project_ref})
     with connection.transaction():
         module = insert(connection, ql_state, tree)
         module_select = EdgeQLSelect(
@@ -144,3 +158,5 @@ def insert_file(connection, file):
             )
             logger.trace("Running post-insert query: %r", update)
             connection.query(update, ids=ql_state.reference_pool)
+
+    return True

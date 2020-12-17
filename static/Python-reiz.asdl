@@ -6,7 +6,9 @@
 
 module Python
 {
-    Module = (stmt* body, type_ignore *type_ignores, string filename)
+    Module = (stmt* body, type_ignore *type_ignores, string filename,
+              project project)
+
     stmt = FunctionDef(identifier name, arguments args,
                        stmt* body, expr* decorator_list, expr? returns,
                        string? type_comment)
@@ -112,4 +114,5 @@ module Python
 
     boolop = And | Or
     unaryop = Invert | Not | UAdd | USub
+    project = (string name, string git_source, string git_revision)
 }

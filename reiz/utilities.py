@@ -1,12 +1,12 @@
-import builtins
-import contextlib
 import json
 import logging
+import sys
 from concurrent.futures import ProcessPoolExecutor
 from enum import Enum
-from functools import partialmethod
+from functools import partialmethod, wraps
 from pathlib import Path
 from typing import ContextManager, List
+from urllib.request import urlopen
 
 from reiz.db.connection import DEFAULT_DATABASE, DEFAULT_DSN
 
@@ -33,20 +33,21 @@ def add_logging_level(name, value):
 
 
 add_logging_level("TRACE", 5)
-logger = logging.getLogger("source")
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] %(funcName)-15s --- %(message)s",
-    datefmt="%m-%d %H:%M",
-)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter("[%(asctime)s] %(funcName)-15s --- %(message)s")
+handler.setFormatter(formatter)
+
+logger.addHandler(handler)
 
 
 def get_executor(workers: int) -> ContextManager:
-    if workers > 1:
-        executor = ProcessPoolExecutor(max_workers=workers)
-    else:
-        executor = contextlib.nullcontext(builtins)
-    return executor
+    return ProcessPoolExecutor(max_workers=workers)
 
 
 def read_config(config: Path) -> List[str]:
@@ -78,6 +79,20 @@ def get_db_settings():
         return {"dsn": DEFAULT_DSN, "database": DEFAULT_DATABASE}
 
 
+def guarded(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            logger.exception(
+                "Guarded function %r failed the execution", func.__name__
+            )
+            return None
+
+    return wrapper
+
+
 class ReizEnum(Enum):
     # normal __repr__: <$cls.$name: $value>
     # ReizEnum __repr__: $cls.$name
@@ -100,3 +115,12 @@ def pprint(obj):
         pprint.pprint(obj)
     else:
         print(black.format_str(repr(obj), mode=BLACK_MODE))
+
+
+def request(url):
+    with urlopen(url) as page:
+        return page.read().decode()
+
+
+def json_request(url):
+    return json.loads(request(url))

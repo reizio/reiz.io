@@ -1,0 +1,14 @@
+- python -m reiz.sampling.get_dataset sampling_data/data.json
+- python -m reiz.sampling.fetch_dataset sampling_data/data.json sampling_data/raw
+- python -m reiz.sampling.sanitize_dataset sampling_data/data.json sampling_data/raw sampsampling_dataling/clean
+
+dataset.json
+[
+    {
+        'pypi_name': str,
+        'pypi_downlaods': int,
+        'git_link': str,
+        'git_revision': str,
+    }
+    ...
+]

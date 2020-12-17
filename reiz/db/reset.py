@@ -6,7 +6,7 @@ from pathlib import Path
 import edgedb
 from edgedb.errors import InvalidReferenceError
 
-from reiz.utilities import get_db_settings
+from reiz.utilities import get_config_settings, get_db_settings
 
 SERVER_MANAGER = [Path("~/.edgedb/bin/edgedb").expanduser(), "server"]
 

@@ -30,8 +30,14 @@ class Sentinel(ast.expr):
     end_col_offset = 0
 
 
+class project(ast.AST):
+    _fields = ("name", "git_source", "git_revision")
+
+
 ast.Sentinel = Sentinel
+ast.project = project
 alter_ast(ast.Module, "_fields", "filename")
+alter_ast(ast.Module, "_fields", "project")
 alter_ast(ast.slice, "_attributes", "sentinel")
 for sum_type in MODULE_ANNOTATED_TYPES:
     alter_ast(sum_type, "_attributes", "_module")

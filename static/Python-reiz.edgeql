@@ -11,6 +11,7 @@ START MIGRATION TO {
             required property filename -> str {
                 constraint exclusive;
             };
+            required link project -> project;
         }
         abstract type stmt {
             required property lineno -> int64;
@@ -420,5 +421,10 @@ START MIGRATION TO {
         scalar type operator extending enum<'Add', 'Sub', 'Mult', 'MatMult', 'Div', 'Mod', 'Pow', 'LShift', 'RShift', 'BitOr', 'BitXor', 'BitAnd', 'FloorDiv'> {}
         scalar type boolop extending enum<'And', 'Or'> {}
         scalar type unaryop extending enum<'Invert', 'Not', 'UAdd', 'USub'> {}
+        type project {
+            required property name -> str;
+            required property git_source -> str;
+            required property git_revision -> str;
+        }
     }
 };
