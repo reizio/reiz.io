@@ -1,17 +1,8 @@
-# reiz.io - Syntactic Source Code Search
+# reiz.io
 
-Reiz bootstrap guide
-```
-echo "{YOR_CONFIG}" > ~/.local/reiz.json
+Reiz is a search engine for source code on syntactic level. It is a multi-stage
+process that starts from collecting most used Python project and ends with an HTTP
+API that takes an intermediate level pattern match language called, [ReizQL](docs/reizql.md).
 
-mkdir sampling_data
-
-python -m reiz.sampling.get_dataset sampling_data/data.json
-python -m reiz.sampling.fetch_dataset sampling_data/data.json sampling_data/raw
-python -m reiz.sampling.sanitize_dataset sampling_data/data.json sampling_data/raw sampsampling_dataling/clean
-
-./script/regen_db.sh
-
-python -m reiz.serialization.serialize sampling_data/data.json sampling_data/clean/
-./script/run_query test_query.reizql
-```
+For creating a new instance, please check out the "[deploy guide](docs/deploy_guide.md)". For any
+other question, feel free to start up a new [discussion](https://github.com/reizio/reiz.io/discussions). 

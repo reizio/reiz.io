@@ -10,6 +10,7 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+from reiz.config import config
 from reiz.edgeql import as_edgeql
 from reiz.fetch import get_stats, run_query
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
@@ -21,7 +22,7 @@ def get_app():
     CORS(app)
 
     extras = {}
-    if config.redis.cached:
+    if config.redis.cache:
         extras["storage_uri"] = config.redis.instance
         redis = redis.from_url(redis_url)
         atexit.register(redis.close)
@@ -67,7 +68,7 @@ def query():
 
     reiz_ql = request.json["query"]
     try:
-        if config.redis.cached:
+        if config.redis.cache:
             results = run_cached_query(reiz_ql)
         else:
             results = run_query(reiz_ql)
