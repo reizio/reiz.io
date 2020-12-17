@@ -1,8 +1,8 @@
 import ast
 import tokenize
-from pathlib import Path
 
-from reiz.db.connection import connect
+from reiz.config import config
+from reiz.database import get_new_connection
 from reiz.db.schema import protected_name
 from reiz.edgeql import (
     EdgeQLCall,
@@ -12,13 +12,11 @@ from reiz.edgeql import (
     as_edgeql,
 )
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
-from reiz.utilities import get_config_settings, get_db_settings, logger
+from reiz.utilities import logger
 
 DEFAULT_LIMIT = 10
 DEFAULT_NODES = ("Module", "AST", "stmt", "expr")
-CLEAN_DIRECTORY = Path(
-    get_config_settings()["instances"]["clean_directory"]
-).expanduser()
+CLEAN_DIRECTORY = config.data.clean_directory
 
 PROJECT_SELECTION = [
     EdgeQLSelector("filename"),
@@ -61,8 +59,8 @@ def get_stats(nodes=DEFAULT_NODES):
         ),
     )
 
-    with connect(**get_db_settings()) as conn:
-        stats = tuple(conn.query(query))
+    with get_new_connection() as connection:
+        stats = tuple(connection.query(query))
 
     return dict(zip(nodes, stats))
 
@@ -70,6 +68,7 @@ def get_stats(nodes=DEFAULT_NODES):
 def fetch(filename, **loc_data):
     with tokenize.open(filename) as file:
         source = file.read()
+
     if loc_data:
         loc_node = LocationNode(**loc_data)
         return ast.get_source_segment(source, loc_node)
@@ -95,8 +94,8 @@ def run_query(reiz_ql, limit=DEFAULT_LIMIT):
     logger.info("EdgeQL query: %r", query)
 
     results = []
-    with connect(**get_db_settings()) as conn:
-        query_set = conn.query(query)
+    with get_new_connection() as connection:
+        query_set = connection.query(query)
 
         for result in query_set:
             loc_data = {}

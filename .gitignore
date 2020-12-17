@@ -123,3 +123,4 @@ dmypy.json
 rawdata/
 errors.log
 results.log
+sampling_data

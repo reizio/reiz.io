@@ -2,12 +2,11 @@
 import timeit
 from argparse import ArgumentParser, FileType
 
-from reiz.db.connection import connect
-from reiz.utilities import get_db_settings
+from reiz.database import get_new_connection
 
 
 def run_raw_edgeql(query, times):
-    with connect(**get_db_settings()) as connection:
+    with get_new_connection() as connection:
         return timeit.timeit(
             "connection.query(query)", number=times, globals=locals()
         )

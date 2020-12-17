@@ -2,21 +2,20 @@ import random
 import warnings
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
 from pathlib import Path
 
-from reiz.db.connection import connect
+from reiz.database import get_new_connection
 from reiz.edgeql import EdgeQLSelect, EdgeQLSelector, construct
 from reiz.sampling import SamplingData
 from reiz.serialization.serializer import insert_file, insert_project_metadata
-from reiz.utilities import get_db_settings, guarded, logger
+from reiz.utilities import guarded, logger
 
 FILE_CACHE = frozenset()
 
 
-def sync_cache(connector):
+def sync_cache():
     global FILE_CACHE
-    with connector() as connection:
+    with get_new_connection() as connection:
         selection = EdgeQLSelect(
             "Module",
             selections=[
@@ -29,9 +28,9 @@ def sync_cache(connector):
 
 
 @guarded
-def insert_project(instance, clean_directory, connector):
+def insert_project(instance, clean_directory):
     instance_directory = clean_directory / instance.name
-    with connector() as connection:
+    with get_new_connection() as connection:
         project_ref = insert_project_metadata(connection, instance)
         for file in instance_directory.glob("**/*.py"):
             filename = str(file.relative_to(clean_directory))
@@ -42,19 +41,15 @@ def insert_project(instance, clean_directory, connector):
                 logger.info("%s successfully inserted", filename)
 
 
-def insert_dataset(data_file, clean_directory, workers, **db_opts):
-    connector = partial(connect, **db_opts)
-
+def insert_dataset(data_file, clean_directory, workers):
     # Collect the files that we have already inserted
-    sync_cache(connector)
+    sync_cache()
 
     instances = SamplingData.load(data_file)
     random.shuffle(instances)
     with ThreadPoolExecutor(workers) as executor:
         futures = [
-            executor.submit(
-                insert_project, instance, clean_directory, connector
-            )
+            executor.submit(insert_project, instance, clean_directory)
             for instance in instances
         ]
         for future in as_completed(futures):
@@ -68,8 +63,6 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("data_file", type=Path)
     parser.add_argument("clean_directory", type=Path)
-    parser.add_argument("--dsn", default=get_db_settings()["dsn"])
-    parser.add_argument("--database", default=get_db_settings()["database"])
     parser.add_argument("--workers", type=int, default=3)
     options = parser.parse_args()
 

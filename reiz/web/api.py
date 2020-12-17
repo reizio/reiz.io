@@ -13,35 +13,34 @@ from flask_limiter.util import get_remote_address
 from reiz.edgeql import as_edgeql
 from reiz.fetch import get_stats, run_query
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
-from reiz.utilities import get_config_settings, normalize
-
-CACHING = None
+from reiz.utilities import normalize
 
 
 def get_app():
-    global CACHING
     app = Flask(__name__)
     CORS(app)
 
     extras = {}
-    if redis_url := get_config_settings().get("redis"):
-        extras["storage_uri"] = redis_url
-        CACHING = redis.from_url(redis_url)
-        atexit.register(CACHING.close)
+    if config.redis.cached:
+        extras["storage_uri"] = config.redis.instance
+        redis = redis.from_url(redis_url)
+        atexit.register(redis.close)
+    else:
+        redis = None
 
     limiter = Limiter(app, key_func=get_remote_address, **extras)
-    return app, limiter
+    return app, limiter, redis
 
 
-app, limiter = get_app()
+app, limiter, redis = get_app()
 
 
 def run_cached_query(reiz_ql):
-    if results := CACHING.get(reiz_ql):
+    if results := redis.get(reiz_ql):
         return json.loads(results)
     else:
         results = run_query(reiz_ql)
-        CACHING.set(reiz_ql, json.dumps(results))
+        redis.set(reiz_ql, json.dumps(results))
         return results
 
 
@@ -68,10 +67,10 @@ def query():
 
     reiz_ql = request.json["query"]
     try:
-        if not CACHING:
-            results = run_query(reiz_ql)
-        else:
+        if config.redis.cached:
             results = run_cached_query(reiz_ql)
+        else:
+            results = run_query(reiz_ql)
     except ReizQLSyntaxError as syntax_err:
         error = {
             "status": "error",

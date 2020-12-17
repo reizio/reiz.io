@@ -3,8 +3,9 @@
 import logging
 from argparse import ArgumentParser
 
+from reiz.database import get_new_connection
 from reiz.serialization.serializer import insert_file
-from reiz.utilities import get_db_settings, logger
+from reiz.utilities import logger
 
 
 # FIX-ME(medium): Collect more stats (such as total
@@ -14,7 +15,7 @@ def insert_single(file, show_queries=False):
     if show_queries:
         logger.setLevel(logging.TRACE)
 
-    with connect(**get_db_settings()) as conn:
+    with get_new_connection() as connection:
         original_query_one = connection.query_one
 
         def query_one_with_stats(*args, **kwargs):

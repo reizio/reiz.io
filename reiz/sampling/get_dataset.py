@@ -28,14 +28,18 @@ def is_github_link(link):
     return len(parts) >= 5 and parts[-4] == "github.com"
 
 
+def contains(item):
+    key, value = item
+    return str(key) in SOURCE_LOCATIONS
+
+
 @guarded
 def get_sampling_data(project, download_count):
     package_response = json_request(PYPI_INSTANCE + f"/{project}/json")
     if info := package_response.get("info"):
         links = info.get("project_urls") or {}
-        sorted(links, key=lambda kv: str(kv[0]) in SOURCE_LOCATIONS)
 
-        for link in links.values():
+        for _, link in sorted(links, key=_contains):
             if is_github_link(link):
                 break
         else:

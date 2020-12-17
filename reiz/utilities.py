@@ -5,10 +5,8 @@ from concurrent.futures import ProcessPoolExecutor
 from enum import Enum
 from functools import partialmethod, wraps
 from pathlib import Path
-from typing import ContextManager, List
+from typing import ContextManager
 from urllib.request import urlopen
-
-from reiz.db.connection import DEFAULT_DATABASE, DEFAULT_DSN
 
 try:
     import black
@@ -48,35 +46,6 @@ logger.addHandler(handler)
 
 def get_executor(workers: int) -> ContextManager:
     return ProcessPoolExecutor(max_workers=workers)
-
-
-def read_config(config: Path) -> List[str]:
-    if config.exists():
-        with open(config) as config_f:
-            data = json.load(config_f)
-        return data
-    else:
-        return []
-
-
-def write_config(config: Path, data: List[str]) -> None:
-    with open(config, "w") as config:
-        json.dump(data, config)
-
-
-def get_config_settings():
-    if DEFAULT_CONFIG_PATH.exists():
-        with open(DEFAULT_CONFIG_PATH) as file:
-            return json.load(file)
-    else:
-        return {}
-
-
-def get_db_settings():
-    if config := get_config_settings():
-        return config["db"]
-    else:
-        return {"dsn": DEFAULT_DSN, "database": DEFAULT_DATABASE}
 
 
 def guarded(func):
