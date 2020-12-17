@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from reiz.db.schema import protected_name
+from reiz.edgeql.schema import protected_name
 
 
 class EdgeQLObject(ABC):

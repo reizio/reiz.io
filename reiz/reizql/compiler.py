@@ -7,8 +7,8 @@ from functools import singledispatch
 from types import SimpleNamespace
 from typing import Any, ClassVar, Dict, List, Optional
 
-from reiz.db.schema import protected_name
 from reiz.edgeql import *
+from reiz.edgeql.schema import protected_name
 from reiz.reizql.nodes import *
 from reiz.reizql.parser import ReizQLSyntaxError
 

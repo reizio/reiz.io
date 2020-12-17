@@ -1,49 +1,17 @@
 # reiz.io - Syntactic Source Code Search
 
-Playground: [search.tree.science](https://search.tree.science)
-
+Reiz bootstrap guide
 ```
+echo "{YOR_CONFIG}" > ~/.local/reiz.json
 
-            reiz.io architecture (ALPHA)
---------------------------------------------------
-input[QUERY]  ->  reiz.reizql.parser[ReizQLAST]  -> |
- user input      intermediate representation        |
-                                                    |
-                                                    |
-reiz.fetch  <-  reiz.reizql.compiler[EdgeQLAST]  <- |
- executor              IR to EdgeQL
-   |
-   |
-   |-------------------------------------------------------------
-                                                                |
-reiz.samplers[PyPI]   ---|                                      |                  
-                         |                                      |
-reiz.samplers[GitHub] ---| -> reiz.pipes.cleaner -> |           |
-                         |                          |           |
-reiz.samplers[....]   ---|                          |           |
- raw source data sampler         sanitizer          |           |
- Python 2 / 3, Markdown,     only Python 3 source   |           |
- videos, various assets.           files            |           |
-                                                    |           |
-                                                    |           |
-    reiz.pipes.insert              <-               |           |
-      AST to EdgeQL                                             |
-          |                                                     |
-          |                                                     |
-          |                                                     |
-          |        ->        EdgeDB        <-         <-        |
-          |                  !core!
-          | 
-          |
-          |
-    reiz.db.reset  <-  static/Python-reiz.edgeql <- |
-      migration                                     |
-       center                                       |
-                                                    |
-                                                    |
-static/Python-reiz.asdl                             |
-       |                                            |
-       | -> reiz.db.schema -> reiz.db.schema_gen -> |
-              schema cfg           ASDL to SDL
-                                    compiler
+mkdir sampling_data
+
+python -m reiz.sampling.get_dataset sampling_data/data.json
+python -m reiz.sampling.fetch_dataset sampling_data/data.json sampling_data/raw
+python -m reiz.sampling.sanitize_dataset sampling_data/data.json sampling_data/raw sampsampling_dataling/clean
+
+./script/regen_db.sh
+
+python -m reiz.serialization.serialize sampling_data/data.json sampling_data/clean/
+./script/run_query test_query.reizql
 ```

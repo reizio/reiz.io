@@ -7,7 +7,7 @@ from typing import List, Optional
 
 import pyasdl
 
-from reiz.db.schema import protected_name
+from reiz.edgeql.schema import protected_name
 
 DEFAULT_INDENT = " " * 4
 EDGEQL_BASICS = {

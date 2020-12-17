@@ -1,14 +1,12 @@
-import builtins
-import contextlib
 import json
 import logging
+import sys
 from concurrent.futures import ProcessPoolExecutor
 from enum import Enum
-from functools import partialmethod
+from functools import partialmethod, wraps
 from pathlib import Path
-from typing import ContextManager, List
-
-from reiz.db.connection import DEFAULT_DATABASE, DEFAULT_DSN
+from typing import ContextManager
+from urllib.request import urlopen
 
 try:
     import black
@@ -33,49 +31,35 @@ def add_logging_level(name, value):
 
 
 add_logging_level("TRACE", 5)
-logger = logging.getLogger("source")
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] %(funcName)-15s --- %(message)s",
-    datefmt="%m-%d %H:%M",
-)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter("[%(asctime)s] %(funcName)-15s --- %(message)s")
+handler.setFormatter(formatter)
+
+logger.addHandler(handler)
 
 
 def get_executor(workers: int) -> ContextManager:
-    if workers > 1:
-        executor = ProcessPoolExecutor(max_workers=workers)
-    else:
-        executor = contextlib.nullcontext(builtins)
-    return executor
+    return ProcessPoolExecutor(max_workers=workers)
 
 
-def read_config(config: Path) -> List[str]:
-    if config.exists():
-        with open(config) as config_f:
-            data = json.load(config_f)
-        return data
-    else:
-        return []
+def guarded(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            logger.exception(
+                "Guarded function %r failed the execution", func.__name__
+            )
+            return None
 
-
-def write_config(config: Path, data: List[str]) -> None:
-    with open(config, "w") as config:
-        json.dump(data, config)
-
-
-def get_config_settings():
-    if DEFAULT_CONFIG_PATH.exists():
-        with open(DEFAULT_CONFIG_PATH) as file:
-            return json.load(file)
-    else:
-        return {}
-
-
-def get_db_settings():
-    if config := get_config_settings():
-        return config["db"]
-    else:
-        return {"dsn": DEFAULT_DSN, "database": DEFAULT_DATABASE}
+    return wrapper
 
 
 class ReizEnum(Enum):
@@ -100,3 +84,12 @@ def pprint(obj):
         pprint.pprint(obj)
     else:
         print(black.format_str(repr(obj), mode=BLACK_MODE))
+
+
+def request(url):
+    with urlopen(url) as page:
+        return page.read().decode()
+
+
+def json_request(url):
+    return json.loads(request(url))
