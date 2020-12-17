@@ -82,7 +82,7 @@ You can run your queries in the forms of files / or from the stdin via `./script
 
 ```
 (.venv38) (Python 3.8.5+) [  1:31ÖÖ ]  [ isidentical@desktop:~/reiz.io(master✗) ]
- $ cat tuple_returning_classmethod.reizql 
+ $ cat tuple_returning_classmethod.reizql
 FunctionDef(
     decorator_list=[
         Name("classmethod")
@@ -109,5 +109,5 @@ reiz can be configured to serve a Web API. For firing it up;
 $ python -m reiz.web.api
 ```
 
-Also there is an `reiz.web.wsgi` which can be used with `gunicorn`. 
+Also there is an `reiz.web.wsgi` which can be used with `gunicorn`.
 

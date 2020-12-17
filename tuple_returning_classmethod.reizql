@@ -1,9 +1,0 @@
-FunctionDef(
-    decorator_list=[
-        Name("classmethod")
-    ],
-    body = [
-        *...,
-        Return(Tuple())
-    ]
-)
