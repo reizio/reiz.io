@@ -14,6 +14,12 @@ from types import SimpleNamespace
 #     },
 #     "data": {
 #         "clean_directory": str
+#     },
+#     "web": {
+#         "host": str,
+#         "port": int,
+#         "workers": int,
+#         "timeout": int
 #     }
 # }
 
@@ -59,7 +65,7 @@ class validator:
 
     def set_if_not_already(self, segment, field, default=None):
         if not hasattr(segment, field):
-            setattr(segment, field, None)
+            setattr(segment, field, default)
 
     def cast(self, segment, field, kind):
         original = getattr(segment, field)
@@ -87,6 +93,11 @@ def proccess_segment(segment):
         raise ValueError(
             f"Given ({segment.clean_directory!s}) clean_directory does not exist."
         )
+
+
+@validator.segment("web", requirements=["timeout", "host", "port"])
+def process_segment(segment):
+    validator.set_if_not_already(segment, "workers", 1)
 
 
 config = sync_config()

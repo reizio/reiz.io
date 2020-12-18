@@ -23,6 +23,11 @@ named `reiz.json`. A simple one might look like this;
     },
     "data": {
         "clean_directory": "~/disk/sampling/clean/"
+    },
+    "web": {
+        "host": "127.0.0.1",
+        "port": 8000,
+        "timeout": 45
     }
 }
 ```

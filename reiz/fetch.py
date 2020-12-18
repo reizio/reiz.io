@@ -1,4 +1,5 @@
 import ast
+import asyncio
 import tokenize
 
 from reiz.config import config
@@ -15,8 +16,8 @@ from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
 from reiz.utilities import logger
 
 DEFAULT_LIMIT = 10
-DEFAULT_NODES = ("Module", "AST", "stmt", "expr")
 CLEAN_DIRECTORY = config.data.clean_directory
+STATISTICS_NODES = ("Module", "AST", "stmt", "expr")
 
 PROJECT_SELECTION = [
     EdgeQLSelector("filename"),
@@ -34,6 +35,15 @@ POSITION_SELECTION = [
     EdgeQLSelector("_module", PROJECT_SELECTION),
 ]
 
+STATS_QUERY = as_edgeql(
+    EdgeQLSelect(
+        EdgeQLUnion.from_seq(
+            EdgeQLCall("count", [protected_name(node, prefix=True)])
+            for node in STATISTICS_NODES
+        )
+    )
+)
+
 
 class LocationNode(ast.AST):
     _attributes = ("lineno", "col_offset", "end_lineno", "end_col_offset")
@@ -49,22 +59,6 @@ def infer_github_url(result):
     )
 
 
-def get_stats(nodes=DEFAULT_NODES):
-    query = as_edgeql(
-        EdgeQLSelect(
-            EdgeQLUnion.from_seq(
-                EdgeQLCall("count", [protected_name(node, prefix=True)])
-                for node in nodes
-            )
-        ),
-    )
-
-    with get_new_connection() as connection:
-        stats = tuple(connection.query(query))
-
-    return dict(zip(nodes, stats))
-
-
 def fetch(filename, **loc_data):
     with tokenize.open(filename) as file:
         source = file.read()
@@ -76,12 +70,14 @@ def fetch(filename, **loc_data):
         return source
 
 
-def run_query(reiz_ql, limit=DEFAULT_LIMIT):
+def _get_query(reiz_ql, limit, offset):
     tree = parse_query(reiz_ql)
     logger.info("ReizQL Tree: %r", tree)
 
     selection = compile_edgeql(tree)
     selection.limit = limit
+    if offset > 0:
+        selection.offset = offset
 
     if tree.positional:
         selection.selections.extend(POSITION_SELECTION)
@@ -92,47 +88,72 @@ def run_query(reiz_ql, limit=DEFAULT_LIMIT):
 
     query = as_edgeql(selection)
     logger.info("EdgeQL query: %r", query)
+    return query, tree.positional
 
+
+def _process_query_set(query_set, is_tree_positional):
     results = []
-    with get_new_connection() as connection:
-        query_set = connection.query(query)
-
-        for result in query_set:
-            loc_data = {}
-            if tree.positional:
-                module = result._module
-                github_link = (
-                    infer_github_url(module)
-                    + f"#L{result.lineno}-L{result.end_lineno}"
-                )
-                loc_data.update(
-                    {
-                        "filename": CLEAN_DIRECTORY / module.filename,
-                        "lineno": result.lineno,
-                        "col_offset": result.col_offset,
-                        "end_lineno": result.end_lineno,
-                        "end_col_offset": result.end_col_offset,
-                    }
-                )
-            elif tree.name == "Module":
-                github_link = infer_github_url(result)
-                loc_data.update(
-                    {"filename": CLEAN_DIRECTORY / result.filename}
-                )
-            else:
-                github_link = None
-
-            try:
-                source = fetch(**loc_data)
-            except Exception:
-                source = None
-
-            results.append(
+    for result in query_set:
+        loc_data = {}
+        if is_tree_positional:
+            module = result._module
+            github_link = (
+                infer_github_url(module)
+                + f"#L{result.lineno}-L{result.end_lineno}"
+            )
+            loc_data.update(
                 {
-                    "source": source,
-                    "filename": loc_data["filename"],
-                    "github_link": github_link,
+                    "filename": str(CLEAN_DIRECTORY / module.filename),
+                    "lineno": result.lineno,
+                    "col_offset": result.col_offset,
+                    "end_lineno": result.end_lineno,
+                    "end_col_offset": result.end_col_offset,
                 }
             )
+        else:
+            github_link = infer_github_url(result)
+            loc_data.update(
+                {"filename": str(CLEAN_DIRECTORY / result.filename)}
+            )
+
+        try:
+            source = fetch(**loc_data)
+        except Exception:
+            source = None
+
+        results.append(
+            {
+                "source": source,
+                "filename": loc_data["filename"],
+                "github_link": github_link,
+            }
+        )
 
     return results
+
+
+def run_query_on_connection(
+    connection, reiz_ql, limit=DEFAULT_LIMIT, offset=0
+):
+    query, is_tree_positional = _get_query(reiz_ql, limit, after)
+    query_set = connection.query(query)
+    return _process_query_set(query_set, is_tree_positional)
+
+
+async def run_query_on_async_connection(
+    connection,
+    reiz_ql,
+    limit=DEFAULT_LIMIT,
+    offset=0,
+    loop=None,
+    timeout=config.web.timeout,
+):
+    query, is_tree_positional = _get_query(reiz_ql, limit, after)
+    coroutine = connection.query(query)
+    query_set = await asyncio.wait_for(coroutine, timeout=timeout, loop=loop)
+    return _process_query_set(query_set, is_tree_positional)
+
+
+def run_query(reiz_ql, limit=DEFAULT_LIMIT):
+    with get_new_connection() as connection:
+        return run_query_on_connection(connection, reiz_ql, limit=limit)
