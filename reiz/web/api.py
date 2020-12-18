@@ -33,7 +33,7 @@ async def query(request):
     if "query" not in request.json:
         return error("Missing 'query' data")
 
-    offset = request.json.get("offset")
+    offset = request.json.get("offset", 0)
     reiz_ql = request.json["query"]
 
     async with app.database_pool.acquire() as connection:
@@ -92,7 +92,7 @@ def error(message, **kwargs):
         {
             "status": "error",
             "results": [],
-            "exception": "Missing 'query' data",
+            "exception": message,
             **kwargs,
         }
     )

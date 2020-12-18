@@ -60,12 +60,12 @@ def infer_github_url(result):
 
 
 def fetch(filename, **loc_data):
-    with tokenize.open(filename) as file:
+    with tokenize.open(CLEAN_DIRECTORY / filename) as file:
         source = file.read()
 
     if loc_data:
         loc_node = LocationNode(**loc_data)
-        return ast.get_source_segment(source, loc_node)
+        return ast.get_source_segment(source, loc_node, padded=True)
     else:
         return source
 
@@ -103,7 +103,7 @@ def _process_query_set(query_set, is_tree_positional):
             )
             loc_data.update(
                 {
-                    "filename": str(CLEAN_DIRECTORY / module.filename),
+                    "filename": module.filename,
                     "lineno": result.lineno,
                     "col_offset": result.col_offset,
                     "end_lineno": result.end_lineno,
@@ -112,9 +112,7 @@ def _process_query_set(query_set, is_tree_positional):
             )
         else:
             github_link = infer_github_url(result)
-            loc_data.update(
-                {"filename": str(CLEAN_DIRECTORY / result.filename)}
-            )
+            loc_data.update({"filename": result.filename})
 
         try:
             source = fetch(**loc_data)
@@ -135,7 +133,7 @@ def _process_query_set(query_set, is_tree_positional):
 def run_query_on_connection(
     connection, reiz_ql, limit=DEFAULT_LIMIT, offset=0
 ):
-    query, is_tree_positional = _get_query(reiz_ql, limit, after)
+    query, is_tree_positional = _get_query(reiz_ql, limit, offset)
     query_set = connection.query(query)
     return _process_query_set(query_set, is_tree_positional)
 
@@ -148,7 +146,7 @@ async def run_query_on_async_connection(
     loop=None,
     timeout=config.web.timeout,
 ):
-    query, is_tree_positional = _get_query(reiz_ql, limit, after)
+    query, is_tree_positional = _get_query(reiz_ql, limit, offset)
     coroutine = connection.query(query)
     query_set = await asyncio.wait_for(coroutine, timeout=timeout, loop=loop)
     return _process_query_set(query_set, is_tree_positional)
