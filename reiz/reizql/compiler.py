@@ -170,12 +170,6 @@ def compile_operator_flip(node, state):
     return EdgeQLGroup(EdgeQLNot(EdgeQLGroup(filters)))
 
 
-@codegen.register(ReizQLAttr)
-def convert_attr(node, state):
-    with state.temp_pointer(node.attr):
-        return generate_type_checked_key(state)
-
-
 @codegen.register(ReizQLLogicalOperation)
 def convert_logical_operation(node, state):
     left = state.as_query(codegen(node.left, state))
@@ -358,6 +352,17 @@ def convert_length(node, state, arguments):
 
     assert filters is not None
     return filters
+
+
+@Signature.register("ATTR", ["attr"])
+def convert_attr(node, state, arguments):
+    if not isinstance(arguments.attr, ReizQLRef):
+        raise ReizQLSyntaxError(
+            f"'ATTR' expected a reference, got {type(arguments.attr).__name__}"
+        )
+
+    with state.temp_pointer(arguments.attr.name):
+        return generate_type_checked_key(state)
 
 
 @codegen.register(ReizQLBuiltin)

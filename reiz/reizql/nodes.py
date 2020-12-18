@@ -90,5 +90,5 @@ class ReizQLNot(ReizQLExpression):
 
 
 @dataclass(unsafe_hash=True)
-class ReizQLAttr(ReizQLExpression):
-    attr: str
+class ReizQLRef(ReizQLExpression):
+    name: str

@@ -3,7 +3,6 @@ import functools
 
 from reiz.edgeql.schema import ENUM_TYPES
 from reiz.reizql.nodes import (
-    ReizQLAttr,
     ReizQLBuiltin,
     ReizQLConstant,
     ReizQLExpand,
@@ -15,10 +14,11 @@ from reiz.reizql.nodes import (
     ReizQLMatchEnum,
     ReizQLNone,
     ReizQLNot,
+    ReizQLRef,
     ReizQLSet,
 )
 
-BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN")
+BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN", "ATTR")
 POSITION_ATTRIBUTES = frozenset(
     ("lineno", "col_offset", "end_lineno", "end_col_offset")
 )
@@ -156,9 +156,6 @@ def parse_set(node):
 def parse_unary(node):
     if isinstance(node.op, ast.Not):
         return ReizQLNot(parse(node.operand))
-    elif isinstance(node.op, ast.Invert):
-        ensure(isinstance(node.operand, ast.Name))
-        return ReizQLAttr(node.operand.id)
     else:
         raise ReizQLSyntaxError.from_node(node, "unknown unary operator")
 
@@ -173,6 +170,11 @@ def parse_starred(node):
         node,
     )
     return ReizQLExpand
+
+
+@parse.register(ast.Name)
+def parse_name(node):
+    return ReizQLRef(node.id)
 
 
 def parse_query(source):

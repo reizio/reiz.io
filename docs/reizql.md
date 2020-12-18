@@ -11,7 +11,6 @@ pattern                 := negatated_pattern
                          | and_pattern
                          | match_pattern
                          | sequential_pattern
-                         | attribute_pattern
                          | atom_pattern
 
 negate_pattern          := 'not' pattern
@@ -19,7 +18,6 @@ or_pattern              := pattern '|' pattern
 and_pattern             := pattern '&' pattern
 match_pattern           := NAME '(' ','.argument+ ')'
 sequential_pattern      := '[' ','.(pattern | '*' IGNORE)+ ']'
-attribute_pattern       := '~' NAME
 
 atom_pattern            := NONE
                          | STRING
@@ -93,6 +91,17 @@ Call(args=LEN(min=3))
 Call(args=LEN(max=7))
 Call(args=LEN(min=5, max=8))
 ```
+##### `ATTR($0)`
+Some types in the [Python's ASDL](https://docs.python.org/3.8/library/ast.html#abstract-grammar)
+are annotated with some attributes (can be seen at the end of declarations). These attributes
+are often used for positional information (such as the start line of the node etc). `$0` can be
+any attribute's value, so that it can be used in a check. A quick example to find all multi-line
+assignments;
+
+```py
+Assign(lineno = not ATTR(end_lineno))
+```
+
 
 #### AST matchers
 The nodes in the [Python's ASDL](https://docs.python.org/3.8/library/ast.html#abstract-grammar) described in this format;
@@ -146,19 +155,6 @@ ClassDef(
 )
 FunctionDef(body=[Expr(), ..., Return()])
 Call(args=[Name(), *..., Attribute(), ..., ....])
-```
-
-### Attribute Pattern
-
-Some types in the [Python's ASDL](https://docs.python.org/3.8/library/ast.html#abstract-grammar)
-are annotated with some attributes (can be seen at the end of declarations). These attributes
-are often used for positional information (such as the start line of the node etc). If you
-want to process attributes, you can simple use `~` (TILDE) notation. It will infer the attribute
-of the current `match_pattern()`. If you want to match all multi-line assignments you can simply
-describe the pattern as the following;
-
-```py
-Assign(lineno = not ~end_lineno)
 ```
 
 ### Atom Pattern
