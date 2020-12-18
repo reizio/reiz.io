@@ -281,3 +281,11 @@ class EdgeQLReizCustomList(EdgeQLStatement):
         query += "FOR __item IN {enumerate(__items)} "
         query += "UNION (SELECT __item.1 { @index := __item.0 })"
         return query
+
+
+@dataclass(unsafe_hash=True)
+class EdgeQLExists(EdgeQLStatement):
+    target: EdgeQLObject
+
+    def construct(self):
+        return "EXISTS " + construct(self.target)

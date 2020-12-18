@@ -21,13 +21,15 @@ match_pattern           := NAME '(' ','.argument+ ')'
 sequential_pattern      := '[' ','.(pattern | '*' IGNORE)+ ']'
 attribute_pattern       := '~' NAME
 
-atom_pattern            := STRING
+atom_pattern            := NONE
+                         | STRING
                          | NUMBER
                          | IGNORE
 
 argument                := pattern
                          | NAME '=' pattern
 
+NONE                    := 'None'
 IGNORE                  := '...'
 NAME                    := 'a'..'Z'
 NUMBER                  := INTEGER | FLOAT

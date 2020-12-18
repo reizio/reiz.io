@@ -30,6 +30,12 @@ class ReizQLExpand(ReizQLExpression):
     ...
 
 
+@object.__new__
+@dataclass(unsafe_hash=True)
+class ReizQLNone(ReizQLExpression):
+    ...
+
+
 @ReizQLObject.register
 class ReizQLLogicOperator(ReizEnum, IntEnum):
     OR = auto()

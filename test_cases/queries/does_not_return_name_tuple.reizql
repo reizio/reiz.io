@@ -1,0 +1,12 @@
+FunctionDef(
+    body=[
+        *...,
+        Return(
+            Tuple(
+                not ALL(
+                    Name()
+                )
+            )
+        )
+    ]
+)

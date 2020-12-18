@@ -13,6 +13,7 @@ from reiz.reizql.nodes import (
     ReizQLLogicOperator,
     ReizQLMatch,
     ReizQLMatchEnum,
+    ReizQLNone,
     ReizQLNot,
     ReizQLSet,
 )
@@ -135,6 +136,8 @@ def parse_binop(node):
 def parse_constant(node):
     if node.value is Ellipsis:
         return ReizQLIgnore
+    elif node.value is None:
+        return ReizQLNone
     else:
         return ReizQLConstant(repr(node.value))
 

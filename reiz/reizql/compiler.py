@@ -369,5 +369,12 @@ def convert_call(node, state):
     return signature.codegen(node, state)
 
 
+@codegen.register(type(ReizQLNone))
+def convert_none(node, state):
+    return EdgeQLNot(
+        as_edgeql_filter_expr(EdgeQLExists(generate_type_checked_key(state)))
+    )
+
+
 def compile_edgeql(node):
     return codegen(node, None)

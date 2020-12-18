@@ -1,0 +1,10 @@
+ClassDef(
+    body = [
+        FunctionDef(
+            decorator_list=[
+                Name("classmethod")
+            ],
+        ),
+        *...
+    ]
+)
