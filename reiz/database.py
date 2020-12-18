@@ -14,3 +14,9 @@ def get_new_raw_connection(*args, **kwargs):
 get_new_connection = partial(
     get_new_raw_connection, database=config.database.database
 )
+
+get_async_db_pool = partial(
+    edgedb.create_async_pool,
+    dsn=config.database.dsn,
+    database=config.database.database,
+)

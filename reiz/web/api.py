@@ -1,137 +1,62 @@
-import atexit
-import json
 import traceback
 from dataclasses import asdict
 
-import edgedb
-import redis
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from edgedb.errors import InvalidReferenceError
+from sanic import Sanic
+from sanic.response import json
+from sanic_cors import CORS
+from sanic_limiter import Limiter, get_remote_address
 
-from reiz.config import config
+from reiz.database import get_async_db_pool
 from reiz.edgeql import as_edgeql
-from reiz.fetch import get_stats, run_query
+from reiz.fetch import (
+    STATISTICS_NODES,
+    STATS_QUERY,
+    run_query_on_async_connection,
+)
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
 from reiz.utilities import normalize
 
-
-def get_app():
-    app = Flask(__name__)
-    CORS(app)
-
-    extras = {}
-    if config.redis.cache:
-        extras["storage_uri"] = config.redis.instance
-        redis = redis.from_url(redis_url)
-        atexit.register(redis.close)
-    else:
-        redis = None
-
-    limiter = Limiter(app, key_func=get_remote_address, **extras)
-    return app, limiter, redis
+app = Sanic(__name__)
+limiter = Limiter(app, key_func=get_remote_address)
+CORS(app)
 
 
-app, limiter, redis = get_app()
-
-
-def run_cached_query(reiz_ql):
-    if results := redis.get(reiz_ql):
-        return json.loads(results)
-    else:
-        results = run_query(reiz_ql)
-        redis.set(reiz_ql, json.dumps(results))
-        return results
-
-
-def validate_keys(*keys):
-    for key in keys:
-        if key not in request.json.keys():
-            return key
+@app.listener("before_server_start")
+async def init(sanic, loop):
+    app.database_pool = await get_async_db_pool()
 
 
 @app.route("/query", methods=["POST"])
-@limiter.limit("240 per hour")
-def query():
-    if key := validate_keys("query"):
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "results": [],
-                    "exception": f"Missing key {key}",
-                }
-            ),
-            412,
-        )
+@limiter.limit("240 per hour;10/minute")
+async def query(request):
+    if "query" not in request.json:
+        return error("Missing 'query' data")
 
+    offset = request.json.get("offset")
     reiz_ql = request.json["query"]
-    try:
-        if config.redis.cache:
-            results = run_cached_query(reiz_ql)
+
+    async with app.database_pool.acquire() as connection:
+        try:
+            results = await run_query_on_async_connection(
+                connection, reiz_ql, offset=offset
+            )
+        except ReizQLSyntaxError as syntax_err:
+            return error(syntax_err.message, **syntax_err.position)
+        except InvalidReferenceError as exc:
+            return error(exc.args[0])
+        except Exception:
+            return error(traceback.format_exc())
         else:
-            results = run_query(reiz_ql)
-    except ReizQLSyntaxError as syntax_err:
-        error = {
-            "status": "error",
-            "results": [],
-            "exception": syntax_err.message,
-        }
-        if syntax_err.position:
-            error.update(syntax_err.position)
-        return jsonify(error), 422
-    except edgedb.errors.InvalidReferenceError as exc:
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "results": [],
-                    "exception": exc.args[0],
-                }
-            ),
-            412,
-        )
-    except Exception:
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "results": [],
-                    "exception": traceback.format_exc(),
-                }
-            ),
-            412,
-        )
-    else:
-        return (
-            jsonify(
+            return json(
                 {"status": "success", "results": results, "exception": None}
-            ),
-            200,
-        )
-
-
-@app.route("/stats", methods=["GET"])
-@limiter.limit("4 per hour")
-def stats():
-    return jsonify(get_stats()), 200
+            )
 
 
 @app.route("/analyze", methods=["POST"])
-@limiter.limit("240 per hour")
-def analyze():
-    if key := validate_keys("query"):
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "results": [],
-                    "exception": f"Missing key {key}",
-                }
-            ),
-            412,
-        )
+async def analyze_query(request):
+    if "query" not in request.json:
+        return error("Missing 'query' data")
 
     results = dict.fromkeys(("exception", "reiz_ql", "edge_ql"))
     try:
@@ -145,8 +70,33 @@ def analyze():
     else:
         results["status"] = "success"
 
-    return jsonify(results), 200
+    return json(results)
+
+
+@app.route("/stats", methods=["GET"])
+async def stats(request):
+    async with app.database_pool.acquire() as connection:
+        stats = tuple(await connection.query(STATS_QUERY))
+
+    return json(
+        {
+            "status": "success",
+            "results": dict(zip(STATISTICS_NODES, stats)),
+            "exception": None,
+        }
+    )
+
+
+def error(message, **kwargs):
+    return json(
+        {
+            "status": "error",
+            "results": [],
+            "exception": "Missing 'query' data",
+            **kwargs,
+        }
+    )
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=True)

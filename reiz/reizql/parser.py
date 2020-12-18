@@ -32,7 +32,7 @@ class ReizQLSyntaxError(Exception):
     @property
     def position(self):
         if len(self.args) < 3:
-            return None
+            return {}
         else:
             lineno, col_offset, end_lineno, end_col_offset = self.args[1:5]
             return {
