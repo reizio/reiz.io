@@ -1,0 +1,8 @@
+ClassDef(
+    body=[
+        FunctionDef(
+            decorator_list=[Name("STARTS_WITH_CLASSMETHOD")],
+        ),
+        *...,
+    ]
+)
