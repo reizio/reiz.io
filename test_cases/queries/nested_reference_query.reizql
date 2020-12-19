@@ -1,0 +1,16 @@
+Module(
+    body = [
+        FunctionDef(
+            ~name,
+            body = [
+                *...,
+                Expr(
+                    Call(
+                        Name(~name)
+                    )
+                )
+            ]
+        ),
+        *...
+    ]
+)

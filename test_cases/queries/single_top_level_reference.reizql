@@ -1,0 +1,11 @@
+FunctionDef(
+    ~name,
+    body = [
+        *...,
+        Return(
+            Call(
+                Name(~name)
+            )
+        )
+    ]
+)

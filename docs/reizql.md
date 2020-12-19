@@ -11,12 +11,14 @@ pattern                 := negatated_pattern
                          | and_pattern
                          | match_pattern
                          | sequential_pattern
+                         | reference_pattern
                          | atom_pattern
 
 negate_pattern          := 'not' pattern
 or_pattern              := pattern '|' pattern
 and_pattern             := pattern '&' pattern
 match_pattern           := NAME '(' ','.argument+ ')'
+reference_pattern       := "~" NAME
 sequential_pattern      := '[' ','.(pattern | '*' IGNORE)+ ']'
 
 atom_pattern            := NONE
@@ -40,14 +42,14 @@ A pattern may be any of these things;
 ### Logical Pattern
 #### NOT pattern
 A logical NOT operator that matches anything but the operand.
-```
+```py
 Call(not Name())
 ```
 would match all `Call()`s where the function is not a `Name()` node.
 
 #### OR pattern
 A logical OR operator that connects 2 different patterns together.
-```
+```py
 Call(Name() | Attribute())
 ```
 would yield all `Call()`s where the function is either `Name()` or `Attribute()`.
@@ -55,7 +57,7 @@ would yield all `Call()`s where the function is either `Name()` or `Attribute()`
 #### AND pattern
 A logical AND operator, works just like the `OR pattern`, useful when combined
 on built-in matchers such as `LEN()` or `ANY()`.
-```
+```py
 Call(args=[*..., Name()] & LEN(min=7))
 ```
 would yield all `Call()`s where the last argument is a `Name()` node, and the
@@ -129,6 +131,30 @@ Name()
 Attribute(Name(), attr='foo')
 FunctionDef(name='foo', body=LEN(max=5))
 ```
+
+### Reference Pattern
+Reiz allows you to give internal references to values of the executed query. These can be thought as
+(some sort of) `variables`. Basically it will try to match the references with each other.
+
+```py
+Module(
+    body = [
+        FunctionDef(
+            ~name,
+            body = [
+                *...,
+                Expr(
+                    Call(
+                        Name(~name)
+                    )
+                )
+            ]
+        ),
+        *...
+    ]
+)
+```
+
 
 ### Sequential Pattern
 

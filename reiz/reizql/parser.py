@@ -156,6 +156,10 @@ def parse_set(node):
 def parse_unary(node):
     if isinstance(node.op, ast.Not):
         return ReizQLNot(parse(node.operand))
+    elif isinstance(node.op, ast.Invert):
+        operand = parse(node.operand)
+        ensure(isinstance(operand, ReizQLRef))
+        return operand
     else:
         raise ReizQLSyntaxError.from_node(node, "unknown unary operator")
 
