@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import singledispatch
 from types import SimpleNamespace
@@ -20,10 +21,13 @@ class CompilerState:
     match: str
     depth: int = 0
     pointer: Optional[str] = None
-    parents: List[CompilerState] = field(default_factory=list)
+    parents: List[CompilerState] = field(default_factory=list, repr=False)
 
     # hand properties store data (like 'enumeration start depth')
     properties: Dict[str, Any] = field(default_factory=dict)
+    definitions: Dict[str, CompilerState] = field(default_factory=dict)
+
+    freeze = deepcopy
 
     @classmethod
     def from_parent(cls, name, parent):
@@ -32,6 +36,7 @@ class CompilerState:
             depth=parent.depth + 1,
             parents=parent.parents + [parent],
             properties=parent.properties,
+            definitions=parent.definitions,
         )
 
     @property
@@ -70,7 +75,8 @@ class CompilerState:
 
     def compile(self, key, value):
         self.pointer = protected_name(key, prefix=False)
-        return self.as_query(codegen(value, self))
+        if query := codegen(value, self):
+            return self.as_query(query)
 
     def as_query(self, query):
         if not is_edgeql_filter_expr(real_object(query)):
@@ -143,7 +149,9 @@ def compile_matcher(node, state):
     for key, value in node.filters.items():
         if value is ReizQLIgnore:
             continue
-        filters = merge_filters(filters, state.compile(key, value))
+
+        if right_filter := state.compile(key, value):
+            filters = merge_filters(filters, right_filter)
 
     if state.is_root:
         return EdgeQLSelect(state.match, filters=filters)
@@ -170,12 +178,6 @@ def compile_operator_flip(node, state):
     return EdgeQLGroup(EdgeQLNot(EdgeQLGroup(filters)))
 
 
-@codegen.register(ReizQLAttr)
-def convert_attr(node, state):
-    with state.temp_pointer(node.attr):
-        return generate_type_checked_key(state)
-
-
 @codegen.register(ReizQLLogicalOperation)
 def convert_logical_operation(node, state):
     left = state.as_query(codegen(node.left, state))
@@ -189,6 +191,14 @@ def convert_logical_operator(node, state):
         return EdgeQLLogicOperator.OR
     elif node is ReizQLLogicOperator.AND:
         return EdgeQLLogicOperator.AND
+
+
+@codegen.register(ReizQLRef)
+def compile_reference(node, state):
+    if node.name in state.definitions:
+        return generate_type_checked_key(state.definitions[node.name])
+    else:
+        state.definitions[node.name] = state.freeze()
 
 
 @codegen.register(ReizQLList)
@@ -208,6 +218,7 @@ def compile_sequence(node, state):
             raise ReizQLSyntaxError(
                 "Can't use multiple expansion macros in one sequence"
             )
+        length_verifier.value -= total
         length_verifier.operator = EdgeQLComparisonOperator.GTE
 
     array_ref = state.as_unique_ref("_sequence")
@@ -358,6 +369,17 @@ def convert_length(node, state, arguments):
 
     assert filters is not None
     return filters
+
+
+@Signature.register("ATTR", ["attr"])
+def convert_attr(node, state, arguments):
+    if not isinstance(arguments.attr, ReizQLRef):
+        raise ReizQLSyntaxError(
+            f"'ATTR' expected a reference, got {type(arguments.attr).__name__}"
+        )
+
+    with state.temp_pointer(arguments.attr.name):
+        return generate_type_checked_key(state)
 
 
 @codegen.register(ReizQLBuiltin)
