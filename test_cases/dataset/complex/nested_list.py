@@ -1,11 +1,11 @@
 class T:  # reiz: tp
-    @STARTS_WITH_CLASSMETHOD
+    @classmethod
     def _():
         ...
 
 
 class Z:  # reiz: tp
-    @STARTS_WITH_CLASSMETHOD
+    @classmethod
     def _():
         ...
 
@@ -14,12 +14,12 @@ class Q:
     def _():
         ...
 
-    @STARTS_WITH_CLASSMETHOD
+    @classmethod
     def __():
         ...
 
 
 class Q:
-    @OTHER_DECORATOR
+    @staticmethod
     def _():
         ...

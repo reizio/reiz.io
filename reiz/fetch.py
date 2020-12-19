@@ -10,6 +10,7 @@ from reiz.edgeql import (
     EdgeQLSelector,
     EdgeQLUnion,
     as_edgeql,
+    merge_filters,
 )
 from reiz.edgeql.schema import protected_name
 from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
@@ -70,13 +71,14 @@ def fetch(filename, **loc_data):
         return source
 
 
-def _get_query(reiz_ql, limit, offset):
+def _get_query(reiz_ql, limit, offset, *, extra_filters=()):
     tree = parse_query(reiz_ql)
     logger.debug("ReizQL Tree: %r", tree)
 
     selection = compile_edgeql(tree)
     if limit is not None:
         selection.limit = limit
+
     if offset > 0:
         selection.offset = offset
 
@@ -86,6 +88,9 @@ def _get_query(reiz_ql, limit, offset):
         selection.selections.extend(PROJECT_SELECTION)
     else:
         raise ReizQLSyntaxError(f"Unexpected root matcher: {tree.name}")
+
+    for extra_filter in extra_filters:
+        selection.filters = merge_filters(selection.filters, extra_filter)
 
     query = as_edgeql(selection)
     logger.debug("EdgeQL query: %r", query)

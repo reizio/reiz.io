@@ -1,4 +1,3 @@
 FunctionDef(
-    decorator_list=[Name("does_not_name_tuple")],
     body=[*..., Return(Tuple(not ALL(Name())))],
 )

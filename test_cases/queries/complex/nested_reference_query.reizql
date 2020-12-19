@@ -1,4 +1,8 @@
 ClassDef(
-    decorator_list=[Name("nested_query_reference")],
-    body=[FunctionDef(~name, body=[*..., Expr(Call(Name(~name)))]), *...],
+    body=[
+        FunctionDef(
+            ~name, body=[*..., Expr(Call(Name(~name)))]
+        ),
+        *...,
+    ],
 )

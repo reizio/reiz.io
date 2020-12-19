@@ -1,19 +1,17 @@
-SIMPLE_NAME_MATCH  # reiz: tp
+foo  # reiz: tp
 
-if test:
-    OTHER_NAME
-    SIMPLE_NAME_MATCH  # reiz: tp
+if 2 + 2:
+    bar  # reiz: tp
+    baz()  # reiz: tp
 
 SIMPLE_NAME_MATCH + x  # reiz: tp
-x + y
+True + False
 
 
 def func():
-    if test:
-        SIMPLE_NAME_MATCH  # reiz: tp
+    if test:  # reiz: tp
+        return None
 
 
 def foo():
-    z << 1
-    not q
-    e(a, SIMPLE_NAME_MATCH)  # reiz: tp
+    z << 1  # reiz: tp

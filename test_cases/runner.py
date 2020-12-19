@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys
 import tokenize
 from argparse import ArgumentParser
@@ -7,7 +9,8 @@ from typing import Set
 
 from reiz.config import config
 from reiz.database import get_new_connection
-from reiz.fetch import run_query_on_connection
+from reiz.edgeql import EdgeQLAttribute, EdgeQLFilter, EdgeQLFilterKey
+from reiz.fetch import _get_query, _process_query_set
 from reiz.sampling import SamplingData
 from reiz.serialization.serialize import insert_project
 from reiz.utilities import logger
@@ -86,11 +89,26 @@ class TestItem:
             )
             raise ExpectationFailed
 
+    def run_test_query(self, connection):
+        query, is_positional = _get_query(
+            self.reiz_ql,
+            limit=None,
+            offset=0,
+            extra_filters=(
+                EdgeQLFilter(
+                    EdgeQLAttribute(EdgeQLFilterKey("_module"), "filename"),
+                    repr(self.expected_filename),
+                ),
+            ),
+        )
+        query_set = connection.query(query)
+        return _process_query_set(
+            query_set, is_positional, include_positions=True
+        )
+
     def execute(self, connection):
         result_line_numbers = set()
-        for result in run_query_on_connection(
-            connection, self.reiz_ql, limit=None, include_positions=True
-        ):
+        for result in self.run_test_query(connection):
             self.expect(
                 "Filenames are not equal",
                 result["filename"] + ":" + str(result["lineno"]),
