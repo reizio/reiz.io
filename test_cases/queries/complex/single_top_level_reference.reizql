@@ -1,0 +1,5 @@
+FunctionDef(
+    ~name,
+    decorator_list=[Name("single_top_level")],
+    body=[*..., Return(Call(Name(~name)))],
+)

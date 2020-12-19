@@ -1,9 +1,0 @@
-FunctionDef(
-    body = [
-        If(
-            test = Name(~name),
-            body = [Return(Name(~name))]
-        ),
-        *...
-    ]
-)

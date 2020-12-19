@@ -1,0 +1,4 @@
+FunctionDef(
+    decorator_list=[Name("nested_sub_level_reference")],
+    body=[If(test=Name(~name), body=[Return(Name(~name))]), *...],
+)

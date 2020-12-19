@@ -72,10 +72,11 @@ def fetch(filename, **loc_data):
 
 def _get_query(reiz_ql, limit, offset):
     tree = parse_query(reiz_ql)
-    logger.info("ReizQL Tree: %r", tree)
+    logger.debug("ReizQL Tree: %r", tree)
 
     selection = compile_edgeql(tree)
-    selection.limit = limit
+    if limit is not None:
+        selection.limit = limit
     if offset > 0:
         selection.offset = offset
 
@@ -87,11 +88,11 @@ def _get_query(reiz_ql, limit, offset):
         raise ReizQLSyntaxError(f"Unexpected root matcher: {tree.name}")
 
     query = as_edgeql(selection)
-    logger.info("EdgeQL query: %r", query)
+    logger.debug("EdgeQL query: %r", query)
     return query, tree.positional
 
 
-def _process_query_set(query_set, is_tree_positional):
+def _process_query_set(query_set, is_tree_positional, include_positions=False):
     results = []
     for result in query_set:
         loc_data = {}
@@ -119,37 +120,47 @@ def _process_query_set(query_set, is_tree_positional):
         except Exception:
             source = None
 
-        results.append(
-            {
-                "source": source,
-                "filename": loc_data["filename"],
-                "github_link": github_link,
-            }
-        )
+        result = {
+            "source": source,
+            "filename": loc_data["filename"],
+            "github_link": github_link,
+        }
+
+        if include_positions:
+            result.update(loc_data)
+
+        results.append(result)
 
     return results
 
 
 def run_query_on_connection(
-    connection, reiz_ql, limit=DEFAULT_LIMIT, offset=0
+    connection,
+    reiz_ql,
+    *,
+    limit=DEFAULT_LIMIT,
+    offset=0,
+    include_positions=False,
 ):
     query, is_tree_positional = _get_query(reiz_ql, limit, offset)
     query_set = connection.query(query)
-    return _process_query_set(query_set, is_tree_positional)
+    return _process_query_set(query_set, is_tree_positional, include_positions)
 
 
 async def run_query_on_async_connection(
     connection,
     reiz_ql,
+    *,
     limit=DEFAULT_LIMIT,
     offset=0,
     loop=None,
     timeout=config.web.timeout,
+    include_positions=False,
 ):
     query, is_tree_positional = _get_query(reiz_ql, limit, offset)
     coroutine = connection.query(query)
     query_set = await asyncio.wait_for(coroutine, timeout=timeout, loop=loop)
-    return _process_query_set(query_set, is_tree_positional)
+    return _process_query_set(query_set, is_tree_positional, include_positions)
 
 
 def run_query(reiz_ql, limit=DEFAULT_LIMIT):
