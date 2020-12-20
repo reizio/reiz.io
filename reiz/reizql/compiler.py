@@ -172,6 +172,15 @@ def compile_constant(node, state):
     return EdgeQLPreparedQuery(str(node.value))
 
 
+@codegen.register(ReizQLMatchString)
+def compile_match_string(node, state):
+    return EdgeQLFilter(
+        generate_type_checked_key(state),
+        codegen(node.value, state),
+        EdgeQLComparisonOperator.LIKE,
+    )
+
+
 @codegen.register(ReizQLNot)
 def compile_operator_flip(node, state):
     filters = state.as_query(codegen(node.value, state))

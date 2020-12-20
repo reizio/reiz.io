@@ -92,3 +92,8 @@ class ReizQLNot(ReizQLExpression):
 @dataclass(unsafe_hash=True)
 class ReizQLRef(ReizQLExpression):
     name: str
+
+
+@dataclass(unsafe_hash=True)
+class ReizQLMatchString(ReizQLExpression):
+    value: str
