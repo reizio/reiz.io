@@ -13,4 +13,4 @@ def get_new_connection(*args, **kwargs):
 
 def get_async_db_pool(*args, **kwargs):
     kwargs.setdefault("database", config.database.database)
-    return edgedb.create_async_pool(dsn=config.database.dsn)
+    return edgedb.create_async_pool(*args, dsn=config.database.dsn, **kwargs)

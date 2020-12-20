@@ -1,12 +1,15 @@
+import json
 import traceback
 from dataclasses import asdict
 
+import aioredis
 from edgedb.errors import InvalidReferenceError
 from sanic import Sanic
-from sanic.response import json
+from sanic.response import json as json_response
 from sanic_cors import CORS
 from sanic_limiter import Limiter, get_remote_address
 
+from reiz.config import config
 from reiz.database import get_async_db_pool
 from reiz.edgeql import as_edgeql
 from reiz.fetch import (
@@ -25,6 +28,33 @@ CORS(app)
 @app.listener("before_server_start")
 async def init(sanic, loop):
     app.database_pool = await get_async_db_pool()
+    if config.redis.cache:
+        app.redis_pool = await aioredis.create_redis_pool(
+            config.redis.instance
+        )
+
+
+@app.listener("after_server_stop")
+async def close_db(app, loop):
+    if config.redis.cache:
+        app.redis_pool.close()
+        await app.redis_pool.wait_closed()
+
+
+async def check_cache(key):
+    if not config.redis.cache:
+        return None
+
+    entry = await app.redis_pool.get(json.dumps(key))
+    if entry is not None:
+        return json.loads(entry)
+
+
+async def set_cache(key, value):
+    if not config.redis.cache:
+        return None
+
+    await app.redis_pool.set(json.dumps(key), json.dumps(value))
 
 
 @app.route("/query", methods=["POST"])
@@ -35,6 +65,9 @@ async def query(request):
 
     offset = request.json.get("offset", 0)
     reiz_ql = request.json["query"]
+
+    if entry := await check_cache(request.json):
+        return success(entry)
 
     async with app.database_pool.acquire() as connection:
         try:
@@ -48,9 +81,8 @@ async def query(request):
         except Exception:
             return error(traceback.format_exc())
         else:
-            return json(
-                {"status": "success", "results": results, "exception": None}
-            )
+            await set_cache(request.json, results)
+            return success(results)
 
 
 @app.route("/analyze", methods=["POST"])
@@ -70,7 +102,7 @@ async def analyze_query(request):
     else:
         results["status"] = "success"
 
-    return json(results)
+    return json_response(results)
 
 
 @app.route("/stats", methods=["GET"])
@@ -78,17 +110,22 @@ async def stats(request):
     async with app.database_pool.acquire() as connection:
         stats = tuple(await connection.query(STATS_QUERY))
 
-    return json(
+    return success(dict(zip(STATISTICS_NODES, stats)))
+
+
+def success(result_set, **kwargs):
+    return json_response(
         {
             "status": "success",
-            "results": dict(zip(STATISTICS_NODES, stats)),
+            "results": result_set,
             "exception": None,
+            **kwargs,
         }
     )
 
 
 def error(message, **kwargs):
-    return json(
+    return json_response(
         {
             "status": "error",
             "results": [],
