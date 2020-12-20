@@ -114,7 +114,14 @@ def insert(connection, ql_state, node):
     return connection.query_one(query)
 
 
-def insert_project_metadata(connection, instance):
+def insert_project_metadata(connection, instance, cache=None):
+    if cache is not None and instance.name in cache:
+        return EdgeQLSelect(
+            "project",
+            filters=make_filter(id=EdgeQLReference(cache[instance.name])),
+            limit=1,
+        )
+
     ql_state = QLState()
     project = ast.project(
         instance.name, instance.git_source, instance.git_revision

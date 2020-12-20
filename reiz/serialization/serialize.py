@@ -5,16 +5,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from reiz.database import get_new_connection
-from reiz.edgeql import EdgeQLSelect, EdgeQLSelector, construct
+from reiz.edgeql import EdgeQLSelect, EdgeQLSelector, as_edgeql
 from reiz.sampling import SamplingData
 from reiz.serialization.serializer import insert_file, insert_project_metadata
 from reiz.utilities import guarded, logger
 
 FILE_CACHE = frozenset()
+PROJECT_CACHE = {}
 
 
 def sync_cache():
-    global FILE_CACHE
+    global FILE_CACHE, PROJECT_CACHE
+
     with get_new_connection() as connection:
         selection = EdgeQLSelect(
             "Module",
@@ -22,16 +24,24 @@ def sync_cache():
                 EdgeQLSelector("filename"),
             ],
         )
-        result_set = connection.query(construct(selection, top_level=True))
+        modules = connection.query(as_edgeql(selection))
 
-    FILE_CACHE = frozenset(module.filename for module in result_set)
+        selection = EdgeQLSelect(
+            "project", selections=[EdgeQLSelector("name")]
+        )
+        projects = connection.query(as_edgeql(selection))
+
+    FILE_CACHE = frozenset(module.filename for module in modules)
+    PROJECT_CACHE.update({project.name: project for project in projects})
 
 
 @guarded
 def insert_project(instance, clean_directory):
     instance_directory = clean_directory / instance.name
     with get_new_connection() as connection:
-        project_ref = insert_project_metadata(connection, instance)
+        project_ref = insert_project_metadata(
+            connection, instance, cache=PROJECT_CACHE
+        )
         for file in instance_directory.glob("**/*.py"):
             filename = str(file.relative_to(clean_directory))
             if filename in FILE_CACHE:
