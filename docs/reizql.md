@@ -12,6 +12,7 @@ pattern                 := negatated_pattern
                          | match_pattern
                          | sequential_pattern
                          | reference_pattern
+                         | match_string_pattern
                          | atom_pattern
 
 negate_pattern          := 'not' pattern
@@ -20,6 +21,7 @@ and_pattern             := pattern '&' pattern
 match_pattern           := NAME '(' ','.argument+ ')'
 reference_pattern       := "~" NAME
 sequential_pattern      := '[' ','.(pattern | '*' IGNORE)+ ']'
+match_string_pattern    := 'f' STRING
 
 atom_pattern            := NONE
                          | STRING
@@ -181,6 +183,25 @@ ClassDef(
 )
 FunctionDef(body=[Expr(), ..., Return()])
 Call(args=[Name(), *..., Attribute(), ..., ....])
+```
+
+### Match String Pattern
+
+If you are looking for all method definitions that suits to a single pattern, you can express
+them with match strings. Special patterns;
+
+| Pattern        | Interpretation                     |
+|----------------|------------------------------------|
+| `%`            | matches zero or more characters    |
+| `_`            | matches exactly one character      |
+| `\%`/`\_`      | matches the literal `%`/`_`        |
+
+The following pattern would match any of these given function names `a1_foo`, `xx_foo`,
+`b2_foo_bar`;
+```py
+FunctionDef(
+    name = f"__\_foo%"
+)
 ```
 
 ### Atom Pattern
