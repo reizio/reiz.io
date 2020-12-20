@@ -1,0 +1,6 @@
+FunctionDef(
+    decorator_list=[
+        Name("classmethod"),
+        *...
+    ]
+)

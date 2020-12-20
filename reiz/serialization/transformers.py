@@ -71,6 +71,17 @@ class QLAst(ast.NodeTransformer):
         node.sentinel = Sentinel()
         return node
 
+    def visit_decorated(self, node):
+        if len(node.decorator_list) >= 1:
+            first_decorator = node.decorator_list[0]
+            node.lineno = first_decorator.lineno
+            node.col_offset = first_decorator.col_offset
+        return node
+
+    visit_FunctionDef = visit_decorated
+    visit_AsyncFunctionDef = visit_decorated
+    visit_ClassDef = visit_decorated
+
     def visit_Constant(self, node):
         node.value = repr(node.value)
         return node
