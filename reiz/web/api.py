@@ -21,6 +21,8 @@ from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
 from reiz.utilities import normalize
 
 app = Sanic(__name__)
+app.config["KEEP_ALIVE_TIMEOUT"] = 120
+
 limiter = Limiter(app, key_func=get_remote_address)
 CORS(app)
 
