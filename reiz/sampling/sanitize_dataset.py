@@ -29,7 +29,7 @@ def sanitize(instance, raw_directory, clean_directory, force):
     src = raw_directory / instance.name
     dest = clean_directory / instance.name
     if dest.exists() and not force:
-        return True
+        return instance
 
     shutil.copytree(src, dest, dirs_exist_ok=True)
 
@@ -45,7 +45,7 @@ def sanitize(instance, raw_directory, clean_directory, force):
     subprocess.check_call(
         ["find", ".", "-type", "d", "-empty", "-delete"], cwd=dest
     )
-    return True
+    return instance
 
 
 def sanitize_dataset(
