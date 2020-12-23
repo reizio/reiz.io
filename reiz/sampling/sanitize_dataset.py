@@ -25,7 +25,7 @@ def source_code(path: Path):
 
 
 @guarded
-def sanitize(instance, raw_directory, clean_directory, force):
+def sanitize(instance, raw_directory, clean_directory, force, ignore_tests):
     src = raw_directory / instance.name
     dest = clean_directory / instance.name
     if dest.exists() and not force:
@@ -33,11 +33,20 @@ def sanitize(instance, raw_directory, clean_directory, force):
 
     shutil.copytree(src, dest, dirs_exist_ok=True)
 
+    def is_test(source):
+        if not ignore_tests:
+            return False
+        return source.name.startswith("test_")
+
     for possible_source in dest.glob("**/*"):
         if not possible_source.is_file():
             continue
 
-        if possible_source.suffix == ".py" and source_code(possible_source):
+        if (
+            possible_source.suffix == ".py"
+            and not is_test(possible_source)
+            and source_code(possible_source)
+        ):
             continue
         else:
             possible_source.unlink()
@@ -49,7 +58,12 @@ def sanitize(instance, raw_directory, clean_directory, force):
 
 
 def sanitize_dataset(
-    data_file, checkout_directory, clean_directory, workers=4, force=False
+    data_file,
+    checkout_directory,
+    clean_directory,
+    workers=4,
+    force=False,
+    ignore_tests=False,
 ):
     clean_directory.mkdir(exist_ok=True)
 
@@ -57,7 +71,12 @@ def sanitize_dataset(
     with get_executor(workers) as executor:
         futures = [
             executor.submit(
-                sanitize, instance, checkout_directory, clean_directory, force
+                sanitize,
+                instance,
+                checkout_directory,
+                clean_directory,
+                force,
+                ignore_tests,
             )
             for instance in instances
         ]
@@ -76,6 +95,7 @@ def main():
     parser.add_argument("clean_directory", type=Path)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--ignore-tests", action="store_true")
     options = parser.parse_args()
 
     with warnings.catch_warnings():
