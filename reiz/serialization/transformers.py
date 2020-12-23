@@ -75,7 +75,7 @@ class QLAst(ast.NodeTransformer):
         if len(node.decorator_list) >= 1:
             first_decorator = node.decorator_list[0]
             node.lineno = first_decorator.lineno
-            node.col_offset = first_decorator.col_offset
+            node.col_offset = first_decorator.col_offset - 1  # '@'
         return node
 
     visit_FunctionDef = visit_decorated
