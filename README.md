@@ -1,3 +1,5 @@
+<p align="center"><img src="https://github.com/reizio/reiz.io/blob/master/static/reiz.png"></p>
+
 # reiz.io
 
 Reiz is a search engine for source code on syntactic level. It is a multi-stage
