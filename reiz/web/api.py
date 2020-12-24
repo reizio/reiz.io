@@ -66,7 +66,10 @@ async def query(request):
         return error("Missing 'query' data")
 
     offset = request.json.get("offset", 0)
-    reiz_ql = request.json["query"]
+
+    # Empty queries are allowed
+    if not (reiz_ql := request.json["query"]):
+        return success([])
 
     if entry := await check_cache(request.json):
         return success(entry)
