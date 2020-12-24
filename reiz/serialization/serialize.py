@@ -2,6 +2,7 @@ import random
 import warnings
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import ExitStack
 from pathlib import Path
 
 from reiz.database import get_new_connection
@@ -36,19 +37,18 @@ def sync_cache():
 
 
 @guarded
-def insert_project(instance, clean_directory):
+def insert_project(connection, instance, clean_directory):
     instance_directory = clean_directory / instance.name
-    with get_new_connection() as connection:
-        project_ref = insert_project_metadata(
-            connection, instance, cache=PROJECT_CACHE
-        )
-        for file in instance_directory.glob("**/*.py"):
-            filename = str(file.relative_to(clean_directory))
-            if filename in FILE_CACHE:
-                continue
+    project_ref = insert_project_metadata(
+        connection, instance, cache=PROJECT_CACHE
+    )
+    for file in instance_directory.glob("**/*.py"):
+        filename = str(file.relative_to(clean_directory))
+        if filename in FILE_CACHE:
+            continue
 
-            if insert_file(connection, file, filename, project_ref):
-                logger.info("%s successfully inserted", filename)
+        if insert_file(connection, file, filename, project_ref):
+            logger.info("%s successfully inserted", filename)
 
 
 def insert_dataset(data_file, clean_directory, workers):
@@ -57,10 +57,22 @@ def insert_dataset(data_file, clean_directory, workers):
 
     instances = SamplingData.load(data_file)
     random.shuffle(instances)
-    with ThreadPoolExecutor(workers) as executor:
+
+    with ExitStack() as stack:
+        executor = stack.enter_context(ThreadPoolExecutor(workers))
+        connection_pools = [
+            stack.enter_context(get_new_connection())
+            for _ in range(workers * 2)
+        ]
+        total_pools = len(connection_pools)
         futures = [
-            executor.submit(insert_project, instance, clean_directory)
-            for instance in instances
+            executor.submit(
+                insert_project,
+                connection_pools[index % total_pools],
+                instance,
+                clean_directory,
+            )
+            for index, instance in enumerate(instances)
         ]
         for future in as_completed(futures):
             instance = future.result()
