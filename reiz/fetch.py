@@ -50,6 +50,15 @@ class LocationNode(ast.AST):
     _attributes = ("lineno", "col_offset", "end_lineno", "end_col_offset")
 
 
+def get_username(link):
+    if link.endswith("/"):
+        index = 3
+    else:
+        index = 2
+
+    return link.split("/")[-index]
+
+
 def infer_github_url(result):
     return (
         result.project.git_source
@@ -117,6 +126,7 @@ def _process_query_set(query_set, is_tree_positional, include_positions=False):
                 }
             )
         else:
+            module = result
             github_link = infer_github_url(result)
             loc_data.update({"filename": result.filename})
 
@@ -126,6 +136,8 @@ def _process_query_set(query_set, is_tree_positional, include_positions=False):
             source = None
 
         result = {
+            "repo": module.project.git_source,
+            "username": get_username(module.project.git_source),
             "source": source,
             "filename": loc_data["filename"],
             "github_link": github_link,
