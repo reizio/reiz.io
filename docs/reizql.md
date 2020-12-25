@@ -105,6 +105,9 @@ assignments;
 ```py
 Assign(lineno = not ATTR(end_lineno))
 ```
+##### `I($0)`
+`I` is an annotation for `Match String Pattern`s where you want to match a string without
+case-sensitivity.
 
 
 #### AST matchers

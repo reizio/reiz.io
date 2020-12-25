@@ -43,7 +43,9 @@ class EdgeQLComparisonOperator(ReizEnum):
     GTE = ">="
     LTE = "<="
     LIKE = "LIKE"
+    ILIKE = "ILIKE"
     NOT_LIKE = "NOT LIKE"
+    NOT_ILIKE = "NOT ILIKE"
 
     def construct(self):
         return self.value

@@ -26,11 +26,12 @@ DATASET_PATH = TESTING_PATH / "dataset"
 QUERIES_PATH = TESTING_PATH / "queries"
 
 
-def update_db():
+def update_db(change_db_schema):
     assert config.database.database == "reiz_test"
-    drop_and_load_db(
-        REPO_PATH / "static" / "Python-reiz.edgeql", reboot_server=False
-    )
+    if change_db_schema:
+        drop_and_load_db(
+            REPO_PATH / "static" / "Python-reiz.edgeql", reboot_server=False
+        )
 
     fake_sampling_data = SamplingData(
         "dataset",
@@ -38,13 +39,14 @@ def update_db():
         git_source="https://github.com/reizio/fake_data",
         git_revision="master",
     )
-    insert_project(fake_sampling_data, TESTING_PATH)
+    with get_new_connection() as connection:
+        insert_project(connection, fake_sampling_data, TESTING_PATH)
 
 
-def setup(use_same_db=False):
+def setup(use_same_db=False, change_db_schema=False):
     config.database.database = "reiz_test"
     if not use_same_db:
-        update_db()
+        update_db(change_db_schema)
 
 
 class ExpectationFailed(Exception):
@@ -150,6 +152,7 @@ def run_tests():
 def main():
     parser = ArgumentParser()
     parser.add_argument("--use-same-db", action="store_true")
+    parser.add_argument("--change-db-schema", action="store_true")
 
     options = parser.parse_args()
     setup(**vars(options))

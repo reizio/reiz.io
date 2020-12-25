@@ -18,7 +18,7 @@ from reiz.reizql.nodes import (
     ReizQLRef,
 )
 
-BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN", "ATTR")
+BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN", "ATTR", "I")
 POSITION_ATTRIBUTES = frozenset(
     ("lineno", "col_offset", "end_lineno", "end_col_offset")
 )

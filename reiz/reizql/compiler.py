@@ -343,10 +343,22 @@ def builtin_type_error(func, expected):
     raise ReizQLSyntaxError(f"{func!r} expects {expected}")
 
 
+@Signature.register("I", ["match_str"])
+def convert_intensive(node, state, arguments):
+    if not isinstance(arguments.match_str, ReizQLMatchString):
+        raise ReizQLSyntaxError(f"I only accepts match strings")
+
+    return EdgeQLFilter(
+        generate_type_checked_key(state),
+        codegen(arguments.match_str.value, state),
+        EdgeQLComparisonOperator.ILIKE,
+    )
+
+
 @Signature.register("ALL", ["value"])
 @Signature.register("ANY", ["value"])
 def convert_all_any(node, state, arguments):
-    query = construct(codegen(arguments.value, state))
+    query = codegen(arguments.value, state)
     return as_edgeql_filter_expr(EdgeQLCall(node.name.lower(), [query]))
 
 
