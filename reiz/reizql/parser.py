@@ -18,7 +18,7 @@ from reiz.reizql.nodes import (
     ReizQLRef,
 )
 
-BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN", "ATTR", "I")
+BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN", "I")
 POSITION_ATTRIBUTES = frozenset(
     ("lineno", "col_offset", "end_lineno", "end_col_offset")
 )
@@ -153,12 +153,11 @@ class Parser:
 
     @parse.register(ast.UnaryOp)
     def parse_unary(self, node):
-        operand = self.parse(node.operand)
         if isinstance(node.op, ast.Not):
-            return ReizQLNot(operand)
+            return ReizQLNot(self.parse(node.operand))
         elif isinstance(node.op, ast.Invert):
-            ensure(isinstance(operand, ReizQLRef))
-            return operand
+            ensure(isinstance(node.operand, ast.Name))
+            return ReizQLRef(node.operand.id)
         else:
             raise ReizQLSyntaxError.from_node(node, "unknown unary operator")
 
@@ -172,10 +171,6 @@ class Parser:
             node,
         )
         return ReizQLExpand
-
-    @parse.register(ast.Name)
-    def parse_name(self, node):
-        return ReizQLRef(node.id)
 
     @parse.register(ast.JoinedStr)
     def parse_match_string(self, node):

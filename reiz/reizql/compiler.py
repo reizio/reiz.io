@@ -462,17 +462,6 @@ def convert_length(node, state, arguments):
     return filters
 
 
-@Signature.register("ATTR", ["attr"])
-def convert_attr(node, state, arguments):
-    if not isinstance(arguments.attr, ReizQLRef):
-        raise ReizQLSyntaxError(
-            f"'ATTR' expected a reference, got {type(arguments.attr).__name__}"
-        )
-
-    with state.temp_pointer(arguments.attr.name):
-        return generate_type_checked_key(state)
-
-
 @codegen.register(ReizQLBuiltin)
 def convert_call(node, state):
     signature = Signature._FUNCTIONS.get(node.name)

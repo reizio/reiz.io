@@ -84,6 +84,7 @@ hand, the `ANY` will do the same thing with an `OR` gate.
 Call(args=ALL(Constant()))
 Call(args=ANY(Attribut()))
 ```
+
 ##### `LEN(min=$0, max=$1)`
 `LEN` is a special utility for ensuring that the length of the matched sequence
 fits the given range. It can either take them both or `min` and `max` indivudually.
@@ -95,16 +96,7 @@ Call(args=LEN(min=3))
 Call(args=LEN(max=7))
 Call(args=LEN(min=5, max=8))
 ```
-##### `ATTR($0)`
-Some types in the [Python's ASDL](https://docs.python.org/3.8/library/ast.html#abstract-grammar)
-are annotated with some attributes (can be seen at the end of declarations). These attributes
-are often used for positional information (such as the start line of the node etc). `$0` can be
-any attribute's value, so that it can be used in a check. A quick example to find all multi-line
-assignments;
 
-```py
-Assign(lineno = not ATTR(end_lineno))
-```
 ##### `I($0)`
 `I` is an annotation for `Match String Pattern`s where you want to match a string without
 case-sensitivity.
