@@ -6,7 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import singledispatch
 from types import SimpleNamespace
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, ClassVar, Counter, Dict, List, Optional
 
 from reiz.edgeql import *
 from reiz.edgeql.schema import protected_name
@@ -16,16 +16,77 @@ from reiz.reizql.parser import ReizQLSyntaxError
 _COMPILER_WORKAROUND_FOR_TARGET = "_singleton"
 
 
+@dataclass
+class Scope:
+    # - 3 kinds of scopes:
+    #   - $CUR   (current scope)
+    #   - $PAR^n (nth parent's scope)
+    #   - $TOP   (initial parent's scope)
+    #
+    # - Each list matcher creates their own scope. Until a list matcher is seen,
+    #   everything belongs to the $CUR.
+    #
+    # - The parent can't access to any of their children's scope
+    #
+    # - $CUR can reach up to $TOP, in a linear way. So if $CUR's parent ($PAR^1)
+    #   has 2 children (one being $CUR), the $CUR can not their sibling's scope but
+    #   can access any symbol defined in between $PAR^n..$TOP.
+    #
+    # Examples:
+    # FunctionDef(
+    #       ~name,                              <= name.1
+    #       decorator_list = [
+    #           Name(~foo),                     <= foo.1
+    #           Name(~foo),                     <= foo.1
+    #       ],
+    #       body = [
+    #           Name(~foo),                     <= foo.2
+    #           Attribute(Name(~foo)),          <= foo.2
+    #           Return(Call(Name(~name)))       <= name.1
+    #       ]
+    #  )
+
+    parents: List[Scope] = field(default_factory=list)
+    definitions: Dict[str, CompilerState] = field(default_factory=dict)
+    reference_counts: Counter[str] = field(default_factory=Counter)
+
+    @classmethod
+    def from_parent(cls, parent):
+        return cls(parents=parent.parents + [parent])
+
+    def lookup(self, name):
+        for scope in reversed(self.parents + [self]):
+            if state := scope.definitions.get(name):
+                scope.reference(name)
+                return state
+        else:
+            return None
+
+    def reference(self, name):
+        self.reference_counts[name] += 1
+
+    def define(self, name, state):
+        self.definitions[name] = state.freeze()
+
+    def exit(self):
+        for definition in self.definitions:
+            if self.reference_counts[definition] < 1:
+                raise ReizQLSyntaxError(f"Unused reference: {definition!r}")
+
+        if len(self.parents) >= 1:
+            return self.parents[-1]
+
+
 @dataclass(unsafe_hash=True)
 class CompilerState:
     match: str
+
     depth: int = 0
     pointer: Optional[str] = None
-    parents: List[CompilerState] = field(default_factory=list, repr=False)
 
-    # hand properties store data (like 'enumeration start depth')
+    scope: Scope = field(default_factory=Scope)
     properties: Dict[str, Any] = field(default_factory=dict)
-    definitions: Dict[str, CompilerState] = field(default_factory=dict)
+    parents: List[CompilerState] = field(default_factory=list, repr=False)
 
     freeze = deepcopy
 
@@ -34,14 +95,22 @@ class CompilerState:
         return cls(
             name,
             depth=parent.depth + 1,
+            scope=parent.scope,
             parents=parent.parents + [parent],
             properties=parent.properties,
-            definitions=parent.definitions,
         )
 
     @property
     def is_root(self):
         return self.depth == 0
+
+    @contextmanager
+    def new_scope(self):
+        try:
+            self.scope = Scope.from_parent(self.scope)
+            yield
+        finally:
+            self.scope = self.scope.exit()
 
     @contextmanager
     def temp_pointer(self, pointer):
@@ -154,6 +223,7 @@ def compile_matcher(node, state):
             filters = merge_filters(filters, right_filter)
 
     if state.is_root:
+        state.scope.exit()
         return EdgeQLSelect(state.match, filters=filters)
     else:
         if filters is None:
@@ -204,10 +274,10 @@ def convert_logical_operator(node, state):
 
 @codegen.register(ReizQLRef)
 def compile_reference(node, state):
-    if node.name in state.definitions:
-        return generate_type_checked_key(state.definitions[node.name])
+    if pointer := state.scope.lookup(node.name):
+        return generate_type_checked_key(pointer)
     else:
-        state.definitions[node.name] = state.freeze()
+        state.scope.define(node.name, state)
 
 
 @codegen.register(ReizQLList)
@@ -262,7 +332,7 @@ def compile_sequence(node, state):
     expansion_seen = False
     with state.temp_flag("in for loop"), state.temp_property(
         "enumeration start depth", state.depth
-    ):
+    ), state.new_scope():
         filters = None
         for position, matcher in enumerate(node.items):
             if matcher is ReizQLIgnore:
