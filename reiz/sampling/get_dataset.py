@@ -48,7 +48,7 @@ def get_sampling_data(project, download_count):
     return SamplingData(project, download_count, link)
 
 
-def get_pypi_dataset(data_file, workers=4):
+def get_pypi_dataset(data_file, workers=4, limit=500):
     response = json_request(PYPI_DATSET_URL)
     instances = []
 
@@ -57,12 +57,19 @@ def get_pypi_dataset(data_file, workers=4):
             executor.submit(get_sampling_data, **package)
             for package in response["rows"]
         ]
+
         for future in as_completed(futures):
             instance = future.result()
             if instance is None:
                 continue
             logger.info("Fetched: %s", instance)
             instances.append(instance)
+            if len(instances) >= limit:
+                break
+
+        for future in futures:
+            if not future.done():
+                future.cancel()
 
     logger.info(
         "%d repositories have been added to the %s",
@@ -76,6 +83,7 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("data_file", type=Path)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--limit", type=int, default=500)
     options = parser.parse_args()
     get_pypi_dataset(**vars(options))
 
