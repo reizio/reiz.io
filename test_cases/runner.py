@@ -37,10 +37,6 @@ TEST_DATABASE_PASSWORD = "reiz123"
 EDB_PROCESS = None
 
 
-def edb_running():
-    return EDB_PROCESS.poll() is None
-
-
 def bootstrap_connection(
     connection, user=TEST_DATABASE_USER, password=TEST_DATABASE_PASSWORD
 ):
@@ -64,9 +60,6 @@ def bootstrap_connection(
 
 
 def setup_edgedb_server():
-    def dump(out, err):
-        print("--OUT--", out, "--ERR-", err, sep="\n")
-
     if not (server_bin := os.getenv("EDGEDB_SERVER_BIN")):
         raise ValueError(
             "--start-edgedb-server option requires EDGEDB_SERVER_BIN to be set in the current environment"
@@ -281,9 +274,13 @@ def main(argv=None):
         change_db_schema=options.change_db_schema,
         start_edgedb_server=options.start_edgedb_server,
     )
+
     fail = run_tests()
     if options.run_benchmarks and not fail:
         run_benchmarks()
+    if EDB_PROCESS is not None:
+        EDB_PROCESS.terminate()
+
     return fail
 
 
