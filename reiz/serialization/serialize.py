@@ -1,94 +1,48 @@
-import random
+import itertools
 import warnings
 from argparse import ArgumentParser
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import ExitStack
+from concurrent import futures
 from pathlib import Path
 
-from reiz.database import get_new_connection
-from reiz.edgeql import EdgeQLSelect, EdgeQLSelector, as_edgeql
 from reiz.sampling import SamplingData
-from reiz.serialization.serializer import insert_file, insert_project_metadata
-from reiz.utilities import guarded, logger
+from reiz.serialization.serializer import insert_project
 
-FILE_CACHE = frozenset()
-PROJECT_CACHE = {}
+TASK_LIMIT = 6
 
 
-def sync_cache():
-    global FILE_CACHE, PROJECT_CACHE
+def insert_dataset(data_file, clean_directory, jobs):
+    instances = SamplingData.iter_load(data_file, random_order=True)
 
-    with get_new_connection() as connection:
-        selection = EdgeQLSelect(
-            "Module",
-            selections=[
-                EdgeQLSelector("filename"),
-            ],
-        )
-        modules = connection.query(as_edgeql(selection))
+    with futures.ThreadPoolExecutor(max_workers=jobs) as executor:
 
-        selection = EdgeQLSelect(
-            "project", selections=[EdgeQLSelector("name")]
-        )
-        projects = connection.query(as_edgeql(selection))
+        def create_tasks(amount):
+            return {
+                executor.submit(insert_project, instance)
+                for instance in itertools.islice(instances, amount)
+            }
 
-    FILE_CACHE = frozenset(module.filename for module in modules)
-    PROJECT_CACHE.update({project.name: project for project in projects})
-
-
-@guarded
-def insert_project(connection, instance, clean_directory):
-    instance_directory = clean_directory / instance.name
-    project_ref = insert_project_metadata(
-        connection, instance, cache=PROJECT_CACHE
-    )
-    for file in instance_directory.glob("**/*.py"):
-        filename = str(file.relative_to(clean_directory))
-        if filename in FILE_CACHE:
-            continue
-
-        if insert_file(connection, file, filename, project_ref):
-            logger.info("%s successfully inserted", filename)
-
-
-def insert_dataset(data_file, clean_directory, workers):
-    # Collect the files that we have already inserted
-    sync_cache()
-
-    instances = SamplingData.load(data_file)
-    random.shuffle(instances)
-
-    with ExitStack() as stack:
-        executor = stack.enter_context(ThreadPoolExecutor(workers))
-        connection_pools = [
-            stack.enter_context(get_new_connection())
-            for _ in range(workers * 2)
-        ]
-        total_pools = len(connection_pools)
-        futures = [
-            executor.submit(
-                insert_project,
-                connection_pools[index % total_pools],
-                instance,
-                clean_directory,
+        tasks = create_tasks(TASK_LIMIT)
+        while tasks:
+            done, tasks = futures.wait(
+                tasks, return_when=futures.FIRST_COMPLETED
             )
-            for index, instance in enumerate(instances)
-        ]
-        for future in as_completed(futures):
-            instance = future.result()
-            if instance is None:
-                continue
-            logger.info("%r has been inserted", instance.name)
+            for task in done:
+                try:
+                    task.exception()
+                except:
+                    exit()
+            tasks.update(create_tasks(len(done)))
 
 
 def main():
     parser = ArgumentParser()
     parser.add_argument("data_file", type=Path)
     parser.add_argument("clean_directory", type=Path)
-    parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument("-j", "--jobs", default=2, type=int)
     options = parser.parse_args()
 
     with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=SyntaxWarning)
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         insert_dataset(**vars(options))
 

@@ -30,7 +30,7 @@ TESTING_PATH = REPO_PATH / "test_cases"
 DATASET_PATH = TESTING_PATH / "dataset"
 QUERIES_PATH = TESTING_PATH / "queries"
 
-TEST_DATABASE_NAME = "reiz_test"
+TEST_DATABASE_NAME = "reiz_testing"
 TEST_DATABASE_USER = "reiz_tester"
 TEST_DATABASE_PASSWORD = "reiz123"
 
@@ -118,17 +118,18 @@ def update_db(change_db_schema):
         git_source="https://github.com/reizio/fake_data",
         git_revision="master",
     )
-    with get_new_connection() as connection:
-        insert_project(connection, fake_sampling_data, TESTING_PATH)
+    insert_project(fake_sampling_data)
 
 
 def setup(
     use_same_db=False, change_db_schema=False, start_edgedb_server=False
 ):
+    config.database.database = TEST_DATABASE_NAME
+    config.data.clean_directory = TESTING_PATH
+
     if start_edgedb_server:
         setup_edgedb_server()
 
-    config.database.database = TEST_DATABASE_NAME
     if not use_same_db:
         update_db(change_db_schema)
 

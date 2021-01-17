@@ -1,9 +1,13 @@
-import ast
-import functools
-import tokenize
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 
+import ast
+import tokenize
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from functools import cached_property, singledispatch
+
+from reiz.config import config
+from reiz.database import get_new_connection
 from reiz.edgeql import (
     EdgeQLCall,
     EdgeQLCast,
@@ -11,6 +15,7 @@ from reiz.edgeql import (
     EdgeQLFilter,
     EdgeQLFilterKey,
     EdgeQLInsert,
+    EdgeQLPreparedQuery,
     EdgeQLReference,
     EdgeQLReizCustomList,
     EdgeQLSelect,
@@ -19,151 +24,201 @@ from reiz.edgeql import (
     EdgeQLVariable,
     as_edgeql,
     make_filter,
-)
-from reiz.edgeql.schema import (
-    ATOMIC_TYPES,
-    ENUM_TYPES,
-    MODULE_ANNOTATED_TYPES,
     protected_name,
 )
+from reiz.edgeql.prepared_queries import FETCH_FILES, FETCH_PROJECTS
+from reiz.edgeql.schema import MODULE_ANNOTATED_TYPES, protected_name
 from reiz.serialization.transformers import (
-    QLAst,
-    Sentinel,
-    infer_base,
-    iter_attributes,
+    BASIC_TYPES,
+    iter_properties,
+    prepare_ast,
 )
 from reiz.utilities import guarded, logger
 
-
-@dataclass(unsafe_hash=True)
-class QLState:
-    fields: Dict[str, Any] = field(default_factory=dict)
-    from_parent: Optional[ast.AST] = None
-    reference_pool: List[str] = field(default_factory=list)
+FILE_CACHE = frozenset()
+PROJECT_CACHE = frozenset()
 
 
-@functools.singledispatch
-def serialize(obj, ql_state, connection):
-    if type(obj) is int:
-        return obj
-    else:
-        message = f"Unexpected object: {obj!r}"
-        if ql_state.from_parent is not None:
-            message += f" flowing from {ql_state.from_parent}"
-        raise ValueError(message + ".")
+def sync_global_cache(connection):
+    global FILE_CACHE, PROJECT_CACHE
+
+    query_set = connection.query(as_edgeql(FETCH_FILES))
+    FILE_CACHE = frozenset(module.filename for module in query_set)
+
+    query_set = connection.query(as_edgeql(FETCH_PROJECTS))
+    PROJECT_CACHE = frozenset(project.name for project in query_set)
 
 
-def serialize_sum(obj, ql_state, connection):
-    obj_type = type(obj)
-    enum_type = obj_type.__base__
-    return EdgeQLCast(
-        protected_name(enum_type.__name__, prefix=True),
-        repr(obj_type.__name__),
-    )
+@dataclass
+class SerializationContext:
+    path: Path
+    project: ast.project
+    connection: EdgeDBConnection
+
+    stack: List[ast.AST] = field(default_factory=list)
+    properties: Dict[str, Any] = field(default_factory=dict)
+    reference_pool: List[UUID4] = field(default_factory=list)
+
+    def new_reference(self, node):
+        query_set = insert(node, self)
+        self.reference_pool.append(query_set.id)
+        return query_set
+
+    def get_tree(self):
+        with tokenize.open(self.path) as stream:
+            source = stream.read()
+
+        tree = prepare_ast(ast.parse(source))
+        tree.project = self.project
+        tree.filename = self.rel_filename
+        return tree
+
+    @contextmanager
+    def enter_node(self, node):
+        try:
+            self.stack.append(node)
+            yield
+        finally:
+            self.stack.pop()
+
+    @property
+    def flows_from(self):
+        if len(self.stack) >= 1:
+            return self.stack[-1]
+        else:
+            return None
+
+    @cached_property
+    def rel_filename(self):
+        return str(self.path.relative_to(config.data.clean_directory))
+
+    @cached_property
+    def skip(self):
+        return self.rel_filename in FILE_CACHE
 
 
-@serialize.register(ast.AST)
-def serialize_ast(obj, ql_state, connection):
-    if isinstance(obj, ENUM_TYPES):
-        return serialize_sum(obj, ql_state, connection)
+@singledispatch
+def serialize(value, context):
+    message = f"Unexpected object for serialization: {value!r} ({type(value)})"
+    if context.flows_from:
+        message += f" (flowing from {context.flows_from})"
+    raise ValueError(message)
 
-    db_obj = insert(connection, ql_state, obj)
-    ql_state.reference_pool.append(db_obj.id)
+
+@serialize.register(ast.project)
+def serialize_project(node, context):
     return EdgeQLSelect(
-        infer_base(obj).__name__,
-        filters=make_filter(id=EdgeQLReference(db_obj)),
+        node.kind_name,
+        filters=make_filter(
+            name=EdgeQLPreparedQuery(repr(context.project.name))
+        ),
         limit=1,
     )
 
 
-@serialize.register(list)
-def serialize_list(obj, ql_state, connection):
-    qlset = EdgeQLSet(
-        [serialize(value, ql_state, connection) for value in obj]
-    )
-    if all(isinstance(value, ENUM_TYPES + ATOMIC_TYPES) for value in obj):
-        return qlset
+@serialize.register(ast.AST)
+def serialize_ast(node, context):
+    if node.is_enum:
+        # <ast::op>'Add'
+        return EdgeQLCast(
+            protected_name(node.base_name, prefix=True), repr(node.kind_name)
+        )
     else:
-        return EdgeQLReizCustomList(qlset)
+        # (INSERT ast::BinOp {.left := ..., ...})
+        reference = context.new_reference(node)
+        # (SELECT ast::expr FILTER .id = ... LIMIT 1)
+        return EdgeQLSelect(
+            node.base_name,
+            filters=make_filter(id=EdgeQLReference(reference)),
+            limit=1,
+        )
+
+
+@serialize.register(list)
+def serialize_sequence(sequence, context):
+    edgeql_set = EdgeQLSet([serialize(value, context) for value in sequence])
+
+    if all(isinstance(item, BASIC_TYPES) for item in sequence):
+        # {1, 2, 3} / {<ast::op>'Add', <ast::op>'Sub', ...}
+        return edgeql_set
+    else:
+        # Inserting a sequence of AST objects would require special
+        # attention to calculate the index property.
+        return EdgeQLReizCustomList(edgeql_set)
 
 
 @serialize.register(str)
-def serialize_string(obj, ql_state, connection):
-    return repr(obj)
+def serialize_string(value, context):
+    return EdgeQLPreparedQuery(repr(value))
+
+
+@serialize.register(int)
+def serialize_integer(value, context):
+    return EdgeQLPreparedQuery(value)
 
 
 @serialize.register(type(None))
-def serialize_sentinel(obj, ql_state, connection):
-    return serialize(Sentinel(), ql_state, connection)
+def serialize_sentinel(value, context):
+    return serialize(ast.Sentinel(), context)
 
 
-def insert(connection, ql_state, node):
-    node_type = type(node).__name__
-    insertions = {}
-    ql_state.from_parent = node
-    for field, value in (*ast.iter_fields(node), *iter_attributes(node)):
-        if value is None:
-            continue
-        elif field in ql_state.fields:
-            insertions[field] = ql_state.fields[field]
-        else:
-            insertions[field] = serialize(value, ql_state, connection)
+def insert(node, context):
+    with context.enter_node(node):
+        insertions = {
+            field: serialize(value, context)
+            for field, value in iter_properties(node)
+            if value is not None
+        }
 
-    query = as_edgeql(EdgeQLInsert(node_type, insertions))
-    logger.trace("Running query: %r", query)
-    return connection.query_one(query)
-
-
-def insert_project_metadata(connection, instance, cache=None):
-    if cache is not None and instance.name in cache:
-        return EdgeQLSelect(
-            "project",
-            filters=make_filter(id=EdgeQLReference(cache[instance.name])),
-            limit=1,
-        )
-
-    ql_state = QLState()
-    project = ast.project(
-        instance.name, instance.git_source, instance.git_revision
-    )
-    return serialize(project, ql_state, connection)
+    query = EdgeQLInsert(node.kind_name, insertions)
+    return context.connection.query_one(as_edgeql(query))
 
 
 @guarded
-def insert_file(connection, file, filename, project_ref):
-    with tokenize.open(file) as file_p:
-        source = file_p.read()
+def insert_file(context):
+    if context.skip:
+        return None
 
-    tree = QLAst.visit(ast.parse(source))
-    tree.filename = filename
-    tree.project = ...
+    tree = context.get_tree()
+    module = insert(tree, context)
+    module_select = EdgeQLSelect(
+        name=tree.kind_name,
+        filters=make_filter(id=EdgeQLReference(module)),
+        limit=1,
+    )
 
-    ql_state = QLState(fields={"project": project_ref})
-    with connection.transaction():
-        module = insert(connection, ql_state, tree)
-        module_select = EdgeQLSelect(
-            name=type(tree).__name__,
-            filters=make_filter(id=EdgeQLReference(module)),
-            limit=1,
+    update_filter = EdgeQLFilter(
+        EdgeQLFilterKey("id"),
+        EdgeQLCall(
+            "array_unpack",
+            [EdgeQLCast("array<uuid>", EdgeQLVariable("ids"))],
+        ),
+        operator=EdgeQLComparisonOperator.CONTAINS,
+    )
+    for base in MODULE_ANNOTATED_TYPES:
+        update = EdgeQLUpdate(
+            base.kind_name,
+            filters=update_filter,
+            assigns={"_module": module_select},
         )
+        context.connection.query(as_edgeql(update), ids=context.reference_pool)
 
-        update_filter = EdgeQLFilter(
-            EdgeQLFilterKey("id"),
-            EdgeQLCall(
-                "array_unpack",
-                [EdgeQLCast("array<uuid>", EdgeQLVariable("ids"))],
-            ),
-            operator=EdgeQLComparisonOperator.CONTAINS,
-        )
-        for base in MODULE_ANNOTATED_TYPES:
-            update = as_edgeql(
-                EdgeQLUpdate(
-                    base.__name__,
-                    filters=update_filter,
-                    assigns={"_module": module_select},
-                ),
-            )
-            logger.trace("Running post-insert query: %r", update)
-            connection.query(update, ids=ql_state.reference_pool)
+    logger.info("%r has been inserted successfully", context.rel_filename)
 
-    return True
+
+def insert_project(instance):
+    project = ast.project(
+        instance.name, instance.git_source, instance.git_revision
+    )
+
+    with get_new_connection() as connection:
+        sync_global_cache(connection)
+        if project.name not in PROJECT_CACHE:
+            project_context = SerializationContext(None, project, connection)
+            insert(project, project_context)
+
+        project_path = config.data.clean_directory / project.name
+        for file in project_path.glob("**/*.py"):
+            file_context = SerializationContext(file, project, connection)
+            with file_context.connection.transaction():
+                insert_file(file_context)

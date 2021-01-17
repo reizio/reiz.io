@@ -1,12 +1,19 @@
 import ast
 
-from reiz.edgeql.schema import MODULE_ANNOTATED_TYPES
+from reiz.edgeql.schema import ATOMIC_TYPES, ENUM_TYPES, MODULE_ANNOTATED_TYPES
+
+BASIC_TYPES = ENUM_TYPES + ATOMIC_TYPES
 
 
 def iter_attributes(node):
     for attribute in node._attributes:
         if hasattr(node, attribute):
             yield attribute, getattr(node, attribute)
+
+
+def iter_properties(node):
+    yield from ast.iter_fields(node)
+    yield from iter_attributes(node)
 
 
 def alter_ast(node, alter_type, value):
@@ -16,6 +23,14 @@ def alter_ast(node, alter_type, value):
         )
     original = getattr(node, alter_type)
     setattr(node, alter_type, original + (value,))
+
+
+def annotate_ast_types(node_type, base=None):
+    for sub_node_type in node_type.__subclasses__():
+        sub_node_type.kind_name = sub_node_type.__name__
+        sub_node_type.base_name = base or sub_node_type.kind_name
+        sub_node_type.is_enum = issubclass(sub_node_type, ENUM_TYPES)
+        annotate_ast_types(sub_node_type, base=sub_node_type.kind_name)
 
 
 class Sentinel(ast.expr):
@@ -98,3 +113,11 @@ def infer_base(node):
         return node_type
     else:
         return node_type.__base__
+
+
+def prepare_ast(tree):
+    tree = QLAst.visit(tree)
+    return tree
+
+
+annotate_ast_types(ast.AST)
