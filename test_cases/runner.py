@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import json
+import os
+import subprocess
 import sys
 import time
 import tokenize
@@ -7,6 +10,8 @@ from argparse import ArgumentParser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Set
+
+import edgedb
 
 from reiz.config import config
 from reiz.database import get_new_connection
@@ -22,13 +27,93 @@ sys.path.insert(0, REPO_PATH)
 from scripts.reset_db import drop_and_load_db
 
 TESTING_PATH = REPO_PATH / "test_cases"
-
 DATASET_PATH = TESTING_PATH / "dataset"
 QUERIES_PATH = TESTING_PATH / "queries"
 
+TEST_DATABASE_NAME = "reiz_test"
+TEST_DATABASE_USER = "reiz_tester"
+TEST_DATABASE_PASSWORD = "reiz123"
+
+EDB_PROCESS = None
+
+
+def edb_running():
+    return EDB_PROCESS.poll() is None
+
+
+def bootstrap_connection(
+    connection, user=TEST_DATABASE_USER, password=TEST_DATABASE_PASSWORD
+):
+    connection.execute(f"CREATE DATABASE {TEST_DATABASE_NAME};")
+    connection.execute(
+        f"""\
+    CREATE SUPERUSER ROLE {user} {{
+        SET password := "{password}"
+    }};
+    """
+    )
+    connection.execute(
+        f"""\
+    CONFIGURE SYSTEM INSERT Auth {{
+        user := "{user}",
+        priority := 10,
+        method := (INSERT SCRAM),
+    }};
+    """
+    )
+
+
+def setup_edgedb_server():
+    def dump(out, err):
+        print("--OUT--", out, "--ERR-", err, sep="\n")
+
+    if not (server_bin := os.getenv("EDGEDB_SERVER_BIN")):
+        raise ValueError(
+            "--start-edgedb-server option requires EDGEDB_SERVER_BIN to be set in the current environment"
+        )
+
+    global EDB_PROCESS
+    EDB_PROCESS = process = subprocess.Popen(
+        [
+            server_bin,
+            "--temp-dir",
+            "--testmode",
+            "--echo-runtime-info",
+            "--port=auto",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        text=True,
+    )
+    for line in process.stdout:
+        prefix, _, raw_data = line.partition(":")
+        if prefix == "EDGEDB_SERVER_DATA":
+            break
+    else:
+        raise ValueError("No EDGEDB_SERVER_DATA on stdout")
+    server_data = json.loads(raw_data)
+
+    # TO-DO(medium): admin=True is deprecated
+    connection = edgedb.connect(
+        host=server_data["runstate_dir"],
+        port=server_data["port"],
+        user="edgedb",
+        database="edgedb",
+        admin=True,
+    )
+    bootstrap_connection(connection)
+
+    config.database.options = {
+        "host": server_data["runstate_dir"],
+        "port": server_data["port"],
+        "user": TEST_DATABASE_USER,
+        "password": TEST_DATABASE_PASSWORD,
+    }
+
 
 def update_db(change_db_schema):
-    assert config.database.database == "reiz_test"
+    assert config.database.database == TEST_DATABASE_NAME
     if change_db_schema:
         drop_and_load_db(
             REPO_PATH / "static" / "Python-reiz.edgeql", reboot_server=False
@@ -44,8 +129,13 @@ def update_db(change_db_schema):
         insert_project(connection, fake_sampling_data, TESTING_PATH)
 
 
-def setup(use_same_db=False, change_db_schema=False):
-    config.database.database = "reiz_test"
+def setup(
+    use_same_db=False, change_db_schema=False, start_edgedb_server=False
+):
+    if start_edgedb_server:
+        setup_edgedb_server()
+
+    config.database.database = TEST_DATABASE_NAME
     if not use_same_db:
         update_db(change_db_schema)
 
@@ -183,11 +273,13 @@ def main(argv=None):
     parser.add_argument("--use-same-db", action="store_true")
     parser.add_argument("--change-db-schema", action="store_true")
     parser.add_argument("--run-benchmarks", action="store_true")
+    parser.add_argument("--start-edgedb-server", action="store_true")
     options = parser.parse_args(argv)
 
     setup(
         use_same_db=options.use_same_db,
         change_db_schema=options.change_db_schema,
+        start_edgedb_server=options.start_edgedb_server,
     )
     fail = run_tests()
     if options.run_benchmarks and not fail:
