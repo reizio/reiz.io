@@ -1,0 +1,18 @@
+{
+    "database": {
+        "dsn": null,
+        "cluster": null,
+        "database": null
+    },
+    "redis": {
+        "cache": false
+    },
+    "data": {
+        "clean_directory": ".temp_reiz/"
+    },
+    "web": {
+        "host": "127.0.0.1",
+        "port": 8000,
+        "timeout": 45
+    }
+}

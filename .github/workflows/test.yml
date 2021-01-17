@@ -19,6 +19,12 @@ jobs:
       with:
         python-version: '3.8'
 
+    - name: Copy reiz config
+      run: |
+        mkdir -p ~/.local/
+        mkdir -p .temp_reiz
+        cp static/ci_config.json ~/.local/reiz.json
+
     - name: Install dependencies
       run: |
         python -m pip install -r requirements.txt
@@ -28,7 +34,6 @@ jobs:
       uses: edgedb/setup-edgedb@v1
       with:
         server-version: nightly
-
 
     - name: Test
       env:
