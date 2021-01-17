@@ -39,4 +39,4 @@ jobs:
       env:
         EDGEDB_SERVER_BIN: edgedb-server
       run: |
-        python test_cases/runner.py --change-db-schema --start-edgedb-server
+        python test_cases/runner.py --change-db-schema --start-edgedb-server --run-benchmarks
