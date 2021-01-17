@@ -1,4 +1,4 @@
-import itertools
+import random
 import warnings
 from argparse import ArgumentParser
 from concurrent import futures
@@ -6,20 +6,27 @@ from pathlib import Path
 
 from reiz.sampling import SamplingData
 from reiz.serialization.serializer import insert_project
+from reiz.utilities import logger
 
 TASK_LIMIT = 6
+FILE_LIMIT = 10
 
 
 def insert_dataset(data_file, clean_directory, jobs):
-    instances = SamplingData.iter_load(data_file, random_order=True)
+    instances = SamplingData.load(data_file, random_order=True)
+    bound_instances = {}
 
     with futures.ThreadPoolExecutor(max_workers=jobs) as executor:
 
         def create_tasks(amount):
-            return {
-                executor.submit(insert_project, instance)
-                for instance in itertools.islice(instances, amount)
-            }
+            tasks = set()
+            for instance in random.sample(instances, k=amount):
+                task = executor.submit(
+                    insert_project, instance, limit=FILE_LIMIT
+                )
+                bound_instances[task] = instance
+                tasks.add(task)
+            return tasks
 
         tasks = create_tasks(TASK_LIMIT)
         while tasks:
@@ -27,10 +34,23 @@ def insert_dataset(data_file, clean_directory, jobs):
                 tasks, return_when=futures.FIRST_COMPLETED
             )
             for task in done:
-                try:
-                    task.exception()
-                except:
-                    exit()
+                instance = bound_instances[task]
+                insertions = task.result()
+                if insertions == 0 and instance in instances:
+                    logger.info(
+                        "%r project has been inserted successfully",
+                        instance.name,
+                    )
+                    bound_instances.pop(task, None)
+                    instances.remove(instance)
+                else:
+                    logger.info(
+                        "%d files from %r project have been inserted"
+                        ", switching to another",
+                        insertions,
+                        instance.name,
+                    )
+
             tasks.update(create_tasks(len(done)))
 
 

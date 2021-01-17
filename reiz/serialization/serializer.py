@@ -4,6 +4,7 @@ import ast
 import tokenize
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from functools import cached_property, singledispatch
 
 from reiz.config import config
@@ -47,6 +48,11 @@ def sync_global_cache(connection):
 
     query_set = connection.query(as_edgeql(FETCH_PROJECTS))
     PROJECT_CACHE = frozenset(project.name for project in query_set)
+
+
+class Insertion(Enum):
+    CACHED = auto()
+    INSERTED = auto()
 
 
 @dataclass
@@ -177,36 +183,40 @@ def insert(node, context):
 @guarded
 def insert_file(context):
     if context.skip:
-        return None
+        return Insertion.CACHED
 
     tree = context.get_tree()
-    module = insert(tree, context)
-    module_select = EdgeQLSelect(
-        name=tree.kind_name,
-        filters=make_filter(id=EdgeQLReference(module)),
-        limit=1,
-    )
-
-    update_filter = EdgeQLFilter(
-        EdgeQLFilterKey("id"),
-        EdgeQLCall(
-            "array_unpack",
-            [EdgeQLCast("array<uuid>", EdgeQLVariable("ids"))],
-        ),
-        operator=EdgeQLComparisonOperator.CONTAINS,
-    )
-    for base in MODULE_ANNOTATED_TYPES:
-        update = EdgeQLUpdate(
-            base.kind_name,
-            filters=update_filter,
-            assigns={"_module": module_select},
+    with context.connection.transaction():
+        module = insert(tree, context)
+        module_select = EdgeQLSelect(
+            name=tree.kind_name,
+            filters=make_filter(id=EdgeQLReference(module)),
+            limit=1,
         )
-        context.connection.query(as_edgeql(update), ids=context.reference_pool)
+
+        update_filter = EdgeQLFilter(
+            EdgeQLFilterKey("id"),
+            EdgeQLCall(
+                "array_unpack",
+                [EdgeQLCast("array<uuid>", EdgeQLVariable("ids"))],
+            ),
+            operator=EdgeQLComparisonOperator.CONTAINS,
+        )
+        for base in MODULE_ANNOTATED_TYPES:
+            update = EdgeQLUpdate(
+                base.kind_name,
+                filters=update_filter,
+                assigns={"_module": module_select},
+            )
+            context.connection.query(
+                as_edgeql(update), ids=context.reference_pool
+            )
 
     logger.info("%r has been inserted successfully", context.rel_filename)
+    return Insertion.INSERTED
 
 
-def insert_project(instance):
+def insert_project(instance, *, limit=None):
     project = ast.project(
         instance.name, instance.git_source, instance.git_revision
     )
@@ -217,8 +227,14 @@ def insert_project(instance):
             project_context = SerializationContext(None, project, connection)
             insert(project, project_context)
 
+        total_inserted = 0
         project_path = config.data.clean_directory / project.name
         for file in project_path.glob("**/*.py"):
+            if limit is not None and total_inserted >= limit:
+                break
+
             file_context = SerializationContext(file, project, connection)
-            with file_context.connection.transaction():
-                insert_file(file_context)
+            if insert_file(file_context) is Insertion.INSERTED:
+                total_inserted += 1
+
+    return total_inserted
