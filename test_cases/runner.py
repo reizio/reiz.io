@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import time
 import tokenize
 from argparse import ArgumentParser
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from reiz.edgeql import EdgeQLAttribute, EdgeQLFilter, EdgeQLFilterKey
 from reiz.fetch import _get_query, _process_query_set
 from reiz.sampling import SamplingData
 from reiz.serialization.serialize import insert_project
-from reiz.utilities import logger
+from reiz.utilities import logger, pprint
 
 REPO_PATH = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, REPO_PATH)
@@ -91,8 +92,8 @@ class TestItem:
             )
             raise ExpectationFailed
 
-    def run_test_query(self, connection):
-        query, is_positional = _get_query(
+    def _as_query(self):
+        return _get_query(
             self.reiz_ql,
             limit=None,
             offset=0,
@@ -103,6 +104,9 @@ class TestItem:
                 ),
             ),
         )
+
+    def run_test_query(self, connection, benchmark=False):
+        query, is_positional = self._as_query()
         query_set = connection.query(query)
         return _process_query_set(
             query_set, is_positional, include_positions=True
@@ -132,6 +136,18 @@ class TestItem:
             result_line_numbers == self.expected_line_numbers,
         )
 
+    def run_benchmarks(self, connection, *, times):
+        runs = []
+        query, _ = self._as_query()
+
+        for _ in range(times):
+            start = time.perf_counter()
+            connection.query(query)
+            end = time.perf_counter()
+            runs.append(end - start)
+
+        return runs
+
 
 def collect_tests(queries=QUERIES_PATH):
     for query in queries.glob("**/*.reizql"):
@@ -139,25 +155,45 @@ def collect_tests(queries=QUERIES_PATH):
 
 
 def run_tests():
+    fail = False
     with get_new_connection() as connection:
         for test_case in collect_tests():
             try:
                 test_case.execute(connection)
             except ExpectationFailed:
+                fail = True
                 logger.info("%s %s", test_case.name, "failed")
             else:
                 logger.info("%s %s", test_case.name, "succeed")
 
+    return fail
 
-def main():
+
+def run_benchmarks(times=3):
+    with get_new_connection() as connection:
+        benchmarks = {
+            test_case.name: test_case.run_benchmarks(connection, times=times)
+            for test_case in collect_tests()
+        }
+        pprint(benchmarks)
+
+
+def main(argv=None):
     parser = ArgumentParser()
     parser.add_argument("--use-same-db", action="store_true")
     parser.add_argument("--change-db-schema", action="store_true")
+    parser.add_argument("--run-benchmarks", action="store_true")
+    options = parser.parse_args(argv)
 
-    options = parser.parse_args()
-    setup(**vars(options))
-    run_tests()
+    setup(
+        use_same_db=options.use_same_db,
+        change_db_schema=options.change_db_schema,
+    )
+    fail = run_tests()
+    if options.run_benchmarks and not fail:
+        run_benchmarks()
+    return fail
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())
