@@ -10,8 +10,10 @@ from typing import Any, ClassVar, Counter, Dict, List, Optional
 
 from reiz.edgeql import *
 from reiz.edgeql.schema import protected_name
+from reiz.reizql.field_db import FIELD_DB
 from reiz.reizql.nodes import *
 from reiz.reizql.parser import ReizQLSyntaxError
+from reiz.serialization.transformers import ast
 
 _COMPILER_WORKAROUND_FOR_TARGET = "_singleton"
 
@@ -82,7 +84,7 @@ class CompilerState:
     match: str
 
     depth: int = 0
-    pointer: Optional[str] = None
+    _pointer: Optional[str] = None
 
     scope: Scope = field(default_factory=Scope)
     properties: Dict[str, Any] = field(default_factory=dict)
@@ -114,12 +116,12 @@ class CompilerState:
 
     @contextmanager
     def temp_pointer(self, pointer):
-        _old_pointer = self.pointer
+        _old_pointer = self._pointer
         try:
-            self.pointer = pointer
+            self._pointer = pointer
             yield
         finally:
-            self.pointer = _old_pointer
+            self._pointer = _old_pointer
 
     @contextmanager
     def temp_flag(self, flag, value=True):
@@ -143,7 +145,7 @@ class CompilerState:
     temp_property = temp_flag
 
     def compile(self, key, value):
-        self.pointer = protected_name(key, prefix=False)
+        self._pointer = key
         if query := codegen(value, self):
             return self.as_query(query)
 
@@ -173,6 +175,14 @@ class CompilerState:
     @property
     def can_raw_name_access(self):
         return self.is_flag_set("in for loop")
+
+    @property
+    def pointer(self):
+        return protected_name(self._pointer, prefix=False)
+
+    @property
+    def field_info(self):
+        return FIELD_DB[self.match][self._pointer]
 
 
 def generate_type_checked_key(state):
@@ -274,9 +284,26 @@ def convert_logical_operator(node, state):
 
 @codegen.register(ReizQLRef)
 def compile_reference(node, state):
+    obtained_type = state.field_info.type
+
     if pointer := state.scope.lookup(node.name):
-        return generate_type_checked_key(pointer)
+        expected_type = pointer.field_info.type
+        if expected_type is not obtained_type:
+            raise ReizQLSyntaxError(
+                f"{node.name} expects {expected_type.__name__!r} got {obtained_type.__name__!r}"
+            )
+
+        left = generate_type_checked_key(state)
+        right = generate_type_checked_key(pointer)
+        if issubclass(expected_type, ast.expr):
+            left = EdgeQLAttribute(left, "tag")
+            right = EdgeQLAttribute(right, "tag")
+        return EdgeQLFilter(left, right)
     else:
+        if not issubclass(obtained_type, (str, int, ast.expr)):
+            raise ReizQLSyntaxError(
+                f"Can't reference to {obtained_type.__name__!r} type"
+            )
         state.scope.define(node.name, state)
 
 

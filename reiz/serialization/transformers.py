@@ -1,6 +1,11 @@
 import ast
 
-from reiz.edgeql.schema import ATOMIC_TYPES, ENUM_TYPES, MODULE_ANNOTATED_TYPES
+from reiz.edgeql.schema import (
+    ATOMIC_TYPES,
+    ENUM_TYPES,
+    MODULE_ANNOTATED_TYPES,
+    TAG_EXCLUDED_FIELDS,
+)
 
 BASIC_TYPES = ENUM_TYPES + ATOMIC_TYPES
 
@@ -25,12 +30,38 @@ def alter_ast(node, alter_type, value):
     setattr(node, alter_type, original + (value,))
 
 
-def annotate_ast_types(node_type, base=None):
+def annotate_ast_types(node_type, base=None, last_id=0):
     for sub_node_type in node_type.__subclasses__():
         sub_node_type.kind_name = sub_node_type.__name__
         sub_node_type.base_name = base or sub_node_type.kind_name
         sub_node_type.is_enum = issubclass(sub_node_type, ENUM_TYPES)
-        annotate_ast_types(sub_node_type, base=sub_node_type.kind_name)
+        sub_node_type.type_id = last_id
+        last_id = annotate_ast_types(
+            sub_node_type, base=sub_node_type.kind_name, last_id=last_id + 1
+        )
+    return last_id + 1
+
+
+def calculate_expr_tag(node):
+    if hasattr(node, "tag"):
+        return node.raw_tag
+    elif node is None:
+        return -1
+
+    tag = [node.type_id]
+    for field, value in ast.iter_fields(node):
+        if field in TAG_EXCLUDED_FIELDS:
+            continue
+
+        if isinstance(value, ast.AST) or value is None:
+            tag.append(calculate_expr_tag(value))
+        elif isinstance(value, list):
+            tag.append(tuple(calculate_expr_tag(item) for item in value))
+        else:
+            tag.append(value)
+
+    node.raw_tag = tuple(tag)
+    return node.raw_tag
 
 
 class Sentinel(ast.expr):
@@ -54,6 +85,7 @@ ast.project = project
 alter_ast(ast.Module, "_fields", "filename")
 alter_ast(ast.Module, "_fields", "project")
 alter_ast(ast.slice, "_attributes", "sentinel")
+alter_ast(ast.expr, "_attributes", "tag")
 for sum_type in MODULE_ANNOTATED_TYPES:
     alter_ast(sum_type, "_attributes", "_module")
 
@@ -81,6 +113,11 @@ class QLAst(ast.NodeTransformer):
         if hasattr(self, f"visit_{type(node).__name__}"):
             self.generic_visit(node)
         return result
+
+    def visit_expr(self, node):
+        calculate_expr_tag(node)
+        node.tag = hash(node.raw_tag)
+        return node
 
     def visit_slice(self, node):
         node.sentinel = Sentinel()

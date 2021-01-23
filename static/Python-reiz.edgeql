@@ -194,6 +194,7 @@ START MIGRATION TO {
             required property col_offset -> int64;
             property end_lineno -> int64;
             property end_col_offset -> int64;
+            property tag -> int64;
             link _module -> PyModule;
         }
         type BoolOp extending expr, AST {

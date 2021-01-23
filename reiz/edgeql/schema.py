@@ -29,6 +29,8 @@ RESERVED_NAMES = frozenset(
     )
 )
 
+TAG_EXCLUDED_FIELDS = ("ctx",)
+
 
 def protected_name(name, *, prefix=True):
     if name in RESERVED_NAMES:

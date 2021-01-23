@@ -1,0 +1,7 @@
+FunctionDef(
+    body = [
+        Expr(~some_call),
+        *...,
+        Return(~some_call)
+    ]
+)

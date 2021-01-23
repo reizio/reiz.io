@@ -18,6 +18,7 @@ else:
     USE_PPRINT = False
     BLACK_MODE = black.Mode(line_length=65)
 
+STATIC_DIR = Path(__file__).parent.parent / "static"
 DEFAULT_CONFIG_PATH = Path("~/.local/reiz.json").expanduser()
 
 

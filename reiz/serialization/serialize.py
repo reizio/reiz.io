@@ -36,12 +36,12 @@ def insert_dataset(data_file, clean_directory, jobs):
             for task in done:
                 instance = bound_instances[task]
                 insertions = task.result()
-                if insertions == 0 and instance in instances:
+                if insertions == 0:
                     logger.info(
                         "%r project has been inserted successfully",
                         instance.name,
                     )
-                    bound_instances.pop(task, None)
+                    bound_instances.pop(task)
                     instances.remove(instance)
                 else:
                     logger.info(
