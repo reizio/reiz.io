@@ -11,13 +11,13 @@ from sanic_limiter import Limiter, get_remote_address
 
 from reiz.config import config
 from reiz.database import get_async_db_pool
-from reiz.edgeql import as_edgeql
 from reiz.fetch import (
     STATISTICS_NODES,
     STATS_QUERY,
     run_query_on_async_connection,
 )
-from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
+from reiz.ir import IR
+from reiz.reizql import ReizQLSyntaxError, compile_to_ir, parse_query
 from reiz.utilities import normalize
 
 app = Sanic(__name__)
@@ -99,7 +99,7 @@ async def analyze_query(request):
     try:
         reiz_ql = parse_query(request.json["query"])
         results["reiz_ql"] = normalize(asdict(reiz_ql))
-        results["edge_ql"] = as_edgeql(compile_edgeql(reiz_ql))
+        results["edge_ql"] = IR.construct(compile_to_ir(reiz_ql))
     except ReizQLSyntaxError as syntax_err:
         results["status"] = "error"
         results["exception"] = syntax_err.message

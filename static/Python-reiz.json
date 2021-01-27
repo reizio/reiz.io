@@ -1,0 +1,1 @@
+{"unique_fields": ["Module.filename"], "tag_exclusions": ["ctx", "type_comment", "simple"], "enum_types": ["boolop", "unaryop", "expr_context", "cmpop", "operator"], "module_annotated_types": ["stmt", "expr", "excepthandler", "arg"]}

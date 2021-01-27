@@ -20,6 +20,9 @@ from types import SimpleNamespace
 #         "port": int,
 #         "workers": int,
 #         "timeout": int
+#     },
+#     "ir": {
+#        "backend": {"edgeql"}
 #     }
 # }
 
@@ -46,8 +49,10 @@ class validator:
     _segments = {}
 
     def validate(self, config):
-        for segment_name, segment in vars(config).items():
-            self._segments[segment_name](segment)
+        for segment, validator in self._segments.items():
+            self.set_if_not_already(config, segment, SimpleNamespace())
+            validator(getattr(config, segment))
+
         return config
 
     def segment(self, segment_name, requirements=()):
@@ -98,6 +103,11 @@ def proccess_segment(segment):
 @validator.segment("web", requirements=["timeout", "host", "port"])
 def process_segment(segment):
     validator.set_if_not_already(segment, "workers", 1)
+
+
+@validator.segment("ir")
+def process_segment(segment):
+    validator.set_if_not_already(segment, "backend", "edgeql")
 
 
 config = sync_config()

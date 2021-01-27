@@ -9,31 +9,8 @@ from functools import cached_property, singledispatch
 
 from reiz.config import config
 from reiz.database import get_new_connection
-from reiz.edgeql import (
-    EdgeQLCall,
-    EdgeQLCast,
-    EdgeQLComparisonOperator,
-    EdgeQLFilter,
-    EdgeQLFilterKey,
-    EdgeQLInsert,
-    EdgeQLPreparedQuery,
-    EdgeQLReference,
-    EdgeQLReizCustomList,
-    EdgeQLSelect,
-    EdgeQLSet,
-    EdgeQLUpdate,
-    EdgeQLVariable,
-    as_edgeql,
-    make_filter,
-    protected_name,
-)
-from reiz.edgeql.prepared_queries import FETCH_FILES, FETCH_PROJECTS
-from reiz.edgeql.schema import MODULE_ANNOTATED_TYPES, protected_name
-from reiz.serialization.transformers import (
-    BASIC_TYPES,
-    iter_properties,
-    prepare_ast,
-)
+from reiz.ir import IR, Schema
+from reiz.serialization.transformers import iter_properties, prepare_ast
 from reiz.utilities import guarded, logger
 
 FILE_CACHE = frozenset()
@@ -43,10 +20,10 @@ PROJECT_CACHE = frozenset()
 def sync_global_cache(connection):
     global FILE_CACHE, PROJECT_CACHE
 
-    query_set = connection.query(as_edgeql(FETCH_FILES))
+    query_set = connection.query(IR.query("module.filenames"))
     FILE_CACHE = frozenset(module.filename for module in query_set)
 
-    query_set = connection.query(as_edgeql(FETCH_PROJECTS))
+    query_set = connection.query(IR.query("project.names"))
     PROJECT_CACHE = frozenset(project.name for project in query_set)
 
 
@@ -60,7 +37,7 @@ class Insertion(Enum):
 class SerializationContext:
     path: Path
     project: ast.project
-    connection: EdgeDBConnection
+    connection: DBConnection
     fast_mode: bool = False
 
     stack: List[ast.AST] = field(default_factory=list)
@@ -118,10 +95,10 @@ def serialize(value, context):
 
 @serialize.register(ast.project)
 def serialize_project(node, context):
-    return EdgeQLSelect(
+    return IR.select(
         node.kind_name,
-        filters=make_filter(
-            name=EdgeQLPreparedQuery(repr(context.project.name))
+        filters=IR.filter(
+            IR.attribute(None, "name"), IR.literal(context.project.name), "="
         ),
         limit=1,
     )
@@ -131,41 +108,48 @@ def serialize_project(node, context):
 def serialize_ast(node, context):
     if node.is_enum:
         # <ast::op>'Add'
-        return EdgeQLCast(
-            protected_name(node.base_name, prefix=True), repr(node.kind_name)
-        )
+        return IR.enum_member(node.base_name, node.kind_name)
     else:
         # (INSERT ast::BinOp {.left := ..., ...})
         reference = context.new_reference(node)
         # (SELECT ast::expr FILTER .id = ... LIMIT 1)
-        return EdgeQLSelect(
-            node.base_name,
-            filters=make_filter(id=EdgeQLReference(reference)),
-            limit=1,
+        return IR.select(
+            node.base_name, filters=IR.object_ref(reference), limit=1
         )
+
+
+_BASIC_SET_TYPES = Schema.enum_types + (int, str)
 
 
 @serialize.register(list)
 def serialize_sequence(sequence, context):
-    edgeql_set = EdgeQLSet([serialize(value, context) for value in sequence])
+    ir_set = IR.set([serialize(value, context) for value in sequence])
 
-    if all(isinstance(item, BASIC_TYPES) for item in sequence):
+    if all(isinstance(item, _BASIC_SET_TYPES) for item in sequence):
         # {1, 2, 3} / {<ast::op>'Add', <ast::op>'Sub', ...}
-        return edgeql_set
+        return ir_set
     else:
         # Inserting a sequence of AST objects would require special
         # attention to calculate the index property.
-        return EdgeQLReizCustomList(edgeql_set)
+        target = IR.name("item")
+        scope = IR.namespace({"items": ir_set})
+        loop = IR.loop(
+            target,
+            IR.call("enumerate", [IR.name("items")]),
+            IR.select(
+                IR.attribute(target, 1),
+                selections=[
+                    IR.assign(IR.property("index"), IR.attribute(target, 0))
+                ],
+            ),
+        )
+        return IR.add_namespace(scope, loop)
 
 
 @serialize.register(str)
-def serialize_string(value, context):
-    return EdgeQLPreparedQuery(repr(value))
-
-
 @serialize.register(int)
-def serialize_integer(value, context):
-    return EdgeQLPreparedQuery(value)
+def serialize_string(value, context):
+    return IR.literal(value)
 
 
 @serialize.register(type(None))
@@ -181,8 +165,8 @@ def insert(node, context):
             if value is not None
         }
 
-    query = EdgeQLInsert(node.kind_name, insertions)
-    return context.connection.query_one(as_edgeql(query))
+    query = IR.insert(node.kind_name, insertions)
+    return context.connection.query_one(IR.construct(query))
 
 
 @guarded
@@ -195,28 +179,25 @@ def insert_file(context):
 
     with context.connection.transaction():
         module = insert(tree, context)
-        module_select = EdgeQLSelect(
-            name=tree.kind_name,
-            filters=make_filter(id=EdgeQLReference(module)),
-            limit=1,
+        module_select = IR.select(
+            tree.kind_name, filters=IR.object_ref(module), limit=1
         )
 
-        update_filter = EdgeQLFilter(
-            EdgeQLFilterKey("id"),
-            EdgeQLCall(
-                "array_unpack",
-                [EdgeQLCast("array<uuid>", EdgeQLVariable("ids"))],
+        update_filter = IR.filter(
+            IR.attribute(None, "id"),
+            IR.call(
+                "array_unpack", [IR.cast("array<uuid>", IR.variable("ids"))]
             ),
-            operator=EdgeQLComparisonOperator.CONTAINS,
+            "IN",
         )
-        for base in MODULE_ANNOTATED_TYPES:
-            update = EdgeQLUpdate(
-                base.kind_name,
+        for base_type in Schema.module_annotated_types:
+            update = IR.update(
+                base_type.kind_name,
                 filters=update_filter,
-                assigns={"_module": module_select},
+                assignments={"_module": module_select},
             )
             context.connection.query(
-                as_edgeql(update), ids=context.reference_pool
+                IR.construct(update), ids=context.reference_pool
             )
 
     logger.info("%r has been inserted successfully", context.rel_filename)

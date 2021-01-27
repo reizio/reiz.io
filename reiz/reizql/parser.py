@@ -1,7 +1,7 @@
 import ast
 import functools
 
-from reiz.edgeql.schema import ENUM_TYPES
+from reiz.ir import IR
 from reiz.reizql.nodes import (
     ReizQLBuiltin,
     ReizQLConstant,
@@ -98,7 +98,7 @@ class Parser:
         else:
             positional = False
 
-        if issubclass(origin, ENUM_TYPES):
+        if issubclass(origin, IR.schema.enum_types):
             return ReizQLMatchEnum(origin.__base__.__name__, name)
         else:
             query = {}
@@ -145,7 +145,7 @@ class Parser:
         elif node.value is None:
             return ReizQLNone
         else:
-            return ReizQLConstant(repr(node.value))
+            return ReizQLConstant(node.value)
 
     @parse.register(ast.List)
     def parse_list(self, node):
@@ -183,7 +183,7 @@ class Parser:
             node,
             "Empty match strings are not allowed",
         )
-        return ReizQLMatchString(ReizQLConstant(repr(original_source)))
+        return ReizQLMatchString(original_source)
 
 
 def parse_query(source):
@@ -203,7 +203,7 @@ def parse_query(source):
     root_node = parser.parse(tree.body[0].value)
 
     ensure(isinstance(root_node, ReizQLMatch), tree.body[0])
-    ensure(root_node.positional or root_node.name == "Module", tree.body[0])
+    ensure(root_node.positional, tree.body[0])
     return root_node
 
 

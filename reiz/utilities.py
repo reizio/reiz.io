@@ -94,3 +94,6 @@ def request(url):
 
 def json_request(url):
     return json.loads(request(url))
+
+
+singleton = object.__new__

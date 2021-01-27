@@ -15,8 +15,8 @@ import edgedb
 
 from reiz.config import config
 from reiz.database import get_new_connection
-from reiz.edgeql import EdgeQLAttribute, EdgeQLFilter, EdgeQLFilterKey
-from reiz.fetch import _get_query, _process_query_set
+from reiz.fetch import compile_query, process_queryset
+from reiz.ir import IR
 from reiz.sampling import SamplingData
 from reiz.serialization.serialize import insert_project
 from reiz.utilities import logger, pprint
@@ -176,25 +176,22 @@ class TestItem:
             )
             raise ExpectationFailed
 
-    def _as_query(self):
-        return _get_query(
-            self.reiz_ql,
-            limit=None,
-            offset=0,
-            extra_filters=(
-                EdgeQLFilter(
-                    EdgeQLAttribute(EdgeQLFilterKey("_module"), "filename"),
-                    repr(self.expected_filename),
-                ),
+    def compile_query(self):
+        query = compile_query(self.reiz_ql, limit=None, offset=0)
+        query.filters = IR.combine_filters(
+            query.filters,
+            IR.filter(
+                IR.attribute(IR.attribute(None, "_module"), "filename"),
+                IR.literal(self.expected_filename),
+                "=",
             ),
         )
+        return IR.construct(query)
 
-    def run_test_query(self, connection, benchmark=False):
-        query, is_positional = self._as_query()
+    def run_test_query(self, connection):
+        query = self.compile_query()
         query_set = connection.query(query)
-        return _process_query_set(
-            query_set, is_positional, include_positions=True
-        )
+        return process_queryset(query_set)
 
     def execute(self, connection):
         result_line_numbers = set()
@@ -222,7 +219,7 @@ class TestItem:
 
     def run_benchmarks(self, connection, *, times):
         runs = []
-        query, _ = self._as_query()
+        query = self.compile_query()
 
         for _ in range(times):
             start = time.perf_counter()

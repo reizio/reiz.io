@@ -1,8 +1,6 @@
--- additions
--- Field(string filename) to the mod.Module
--- Field(mod _module) to the stmt/expr/slice attributes
--- Field(constant value) => Field(string value) to the expr.Constant
--- Constructor(Sentinel) => For covering dict-unpacking
+-- Reiz Metadata
+-- unique_fields: ['Module.filename']
+-- tag_exclusions: ['ctx', 'type_comment', 'simple']
 
 module Python
 {
@@ -46,6 +44,7 @@ module Python
           | Nonlocal(identifier* names)
           | Expr(expr value)
           | Pass | Break | Continue
+    
           attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, Module? _module)
 
     expr = BoolOp(boolop op, expr* values)
@@ -103,16 +102,14 @@ module Python
 
     type_ignore = TypeIgnore(int lineno, string tag)
 
-    cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is 
-          | IsNot | In | NotIn
-
+    boolop = And | Or
+    unaryop = Invert | Not | UAdd | USub
     expr_context = Load | Store | Del
                  | AugLoad | AugStore | Param
-
+    cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is 
+          | IsNot | In | NotIn
     operator = Add | Sub | Mult | MatMult | Div | Mod | Pow
              | LShift | RShift | BitOr | BitXor | BitAnd | FloorDiv
 
-    boolop = And | Or
-    unaryop = Invert | Not | UAdd | USub
     project = (string name, string git_source, string git_revision)
 }
