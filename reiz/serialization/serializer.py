@@ -52,6 +52,7 @@ def sync_global_cache(connection):
 
 class Insertion(Enum):
     CACHED = auto()
+    SKIPPED = auto()
     INSERTED = auto()
 
 
@@ -60,6 +61,7 @@ class SerializationContext:
     path: Path
     project: ast.project
     connection: EdgeDBConnection
+    fast_mode: bool = False
 
     stack: List[ast.AST] = field(default_factory=list)
     properties: Dict[str, Any] = field(default_factory=dict)
@@ -73,6 +75,9 @@ class SerializationContext:
     def get_tree(self):
         with tokenize.open(self.path) as stream:
             source = stream.read()
+
+        if self.fast_mode and len(source) > 80 * 80:
+            return None
 
         tree = prepare_ast(ast.parse(source))
         tree.project = self.project
@@ -185,7 +190,9 @@ def insert_file(context):
     if context.skip:
         return Insertion.CACHED
 
-    tree = context.get_tree()
+    if not (tree := context.get_tree()):
+        return Insertion.SKIPPED
+
     with context.connection.transaction():
         module = insert(tree, context)
         module_select = EdgeQLSelect(
@@ -216,7 +223,7 @@ def insert_file(context):
     return Insertion.INSERTED
 
 
-def insert_project(instance, *, limit=None):
+def insert_project(instance, *, limit=None, fast=False):
     project = ast.project(
         instance.name, instance.git_source, instance.git_revision
     )
@@ -233,7 +240,9 @@ def insert_project(instance, *, limit=None):
             if limit is not None and total_inserted >= limit:
                 break
 
-            file_context = SerializationContext(file, project, connection)
+            file_context = SerializationContext(
+                file, project, connection, fast
+            )
             if insert_file(file_context) is Insertion.INSERTED:
                 total_inserted += 1
 
