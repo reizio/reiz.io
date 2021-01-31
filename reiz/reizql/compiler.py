@@ -230,12 +230,18 @@ def compile_matcher(node, state):
 @codegen.register(ReizQLMatchEnum)
 def convert_match_enum(node, state):
     expr = IR.enum_member(node.base, node.name)
-    return IR.filter(state.compue_path(), expr, "=")
+    return IR.filter(state.compute_path(), expr, "=")
 
 
 @codegen.register(ReizQLConstant)
 def compile_constant(node, state):
     expr = IR.literal(node.value)
+
+    # Constants are represented as repr(obj) in the
+    # serialization part, so we have to re-cast it.
+    if state.match == "Constant":
+        expr.value = repr(expr.value)
+
     return IR.filter(state.compute_path(), expr, "=")
 
 

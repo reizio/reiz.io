@@ -235,14 +235,18 @@ def collect_tests(queries=QUERIES_PATH):
         yield TestItem.from_test_path(query)
 
 
-def run_tests():
+def run_tests(allow_fail):
     fail = False
     with get_new_connection() as connection:
         for test_case in collect_tests():
             try:
                 test_case.execute(connection)
             except ExpectationFailed:
-                fail = True
+                if test_case.name not in allow_fail:
+                    fail = True
+                logger.info(
+                    "%s's query: %r", test_case.name, test_case.compile_query()
+                )
                 logger.info("%s %s", test_case.name, "failed")
             else:
                 logger.info("%s %s", test_case.name, "succeed")
@@ -265,6 +269,7 @@ def main(argv=None):
     parser.add_argument("--change-db-schema", action="store_true")
     parser.add_argument("--run-benchmarks", action="store_true")
     parser.add_argument("--start-edgedb-server", action="store_true")
+    parser.add_argument("--allow-fail", nargs="+")
     options = parser.parse_args(argv)
 
     setup(
@@ -273,7 +278,7 @@ def main(argv=None):
         start_edgedb_server=options.start_edgedb_server,
     )
 
-    fail = run_tests()
+    fail = run_tests(options.allow_fail)
     if options.run_benchmarks and not fail:
         run_benchmarks()
     if EDB_PROCESS is not None:

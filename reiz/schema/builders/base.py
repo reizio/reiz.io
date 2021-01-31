@@ -9,11 +9,11 @@ class BaseSchemaGenerator:
     # A mapping between ASDL types => Native DB types
     TYPE_MAP = {}
     # Required fields for reiz.schema.Schema
-    SCHEMA_FIELDS = [
+    SCHEMA_FIELDS = (
         "unique_fields",
         "tag_exclusions",
         "module_annotated_types",
-    ]
+    )
 
 
 def generate_schema(*args, **kwargs):

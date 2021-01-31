@@ -182,7 +182,6 @@ class Union(ComplexExpression):
 
 @dataclass
 class _Container(Expression):
-
     items: List[EQL] = field(default_factory=list)
 
     def construct(self, state):
@@ -330,7 +329,6 @@ class Selection(Unit):
 
 @dataclass
 class With(Statement):
-
     body: List[EQL] = field(default_factory=list)
 
     def construct(self, state):
@@ -351,7 +349,6 @@ class WrappedStatement(Statement):
 
 @dataclass
 class Insert(Statement):
-
     model: str
     body: List[EQL] = field(default_factory=list)
 
