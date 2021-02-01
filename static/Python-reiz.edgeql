@@ -417,11 +417,11 @@ START MIGRATION TO {
             required property lineno -> int64;
             required property tag -> str;
         }
-        scalar type cmpop extending enum<'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn'> {}
-        scalar type expr_context extending enum<'Load', 'Store', 'Del', 'AugLoad', 'AugStore', 'Param'> {}
-        scalar type operator extending enum<'Add', 'Sub', 'Mult', 'MatMult', 'Div', 'Mod', 'Pow', 'LShift', 'RShift', 'BitOr', 'BitXor', 'BitAnd', 'FloorDiv'> {}
         scalar type boolop extending enum<'And', 'Or'> {}
         scalar type unaryop extending enum<'Invert', 'Not', 'UAdd', 'USub'> {}
+        scalar type expr_context extending enum<'Load', 'Store', 'Del', 'AugLoad', 'AugStore', 'Param'> {}
+        scalar type cmpop extending enum<'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn'> {}
+        scalar type operator extending enum<'Add', 'Sub', 'Mult', 'MatMult', 'Div', 'Mod', 'Pow', 'LShift', 'RShift', 'BitOr', 'BitXor', 'BitAnd', 'FloorDiv'> {}
         type project {
             required property name -> str;
             required property git_source -> str;

@@ -1,0 +1,5 @@
+BinOp(
+    left = Call(args=[..., ...]),
+    right = Constant(2) | Constant(4),
+    op = Add()
+)

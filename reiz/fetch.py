@@ -4,43 +4,35 @@ import tokenize
 
 from reiz.config import config
 from reiz.database import get_new_connection
-from reiz.edgeql import (
-    EdgeQLCall,
-    EdgeQLSelect,
-    EdgeQLSelector,
-    EdgeQLUnion,
-    as_edgeql,
-    merge_filters,
-)
-from reiz.edgeql.schema import protected_name
-from reiz.reizql import ReizQLSyntaxError, compile_edgeql, parse_query
-from reiz.utilities import logger
+from reiz.ir import IR
+from reiz.reizql import compile_to_ir, parse_query
 
 DEFAULT_LIMIT = 10
 CLEAN_DIRECTORY = config.data.clean_directory
 STATISTICS_NODES = ("Module", "AST", "stmt", "expr")
 
-PROJECT_SELECTION = [
-    EdgeQLSelector("filename"),
-    EdgeQLSelector(
-        "project",
-        [EdgeQLSelector("git_source"), EdgeQLSelector("git_revision")],
+POSITION_SELECTION = [
+    IR.selection("lineno"),
+    IR.selection("col_offset"),
+    IR.selection("end_lineno"),
+    IR.selection("end_col_offset"),
+    IR.selection(
+        "_module",
+        [
+            IR.selection("filename"),
+            IR.selection(
+                "project",
+                [IR.selection("git_source"), IR.selection("git_revision")],
+            ),
+        ],
     ),
 ]
 
-POSITION_SELECTION = [
-    EdgeQLSelector("lineno"),
-    EdgeQLSelector("col_offset"),
-    EdgeQLSelector("end_lineno"),
-    EdgeQLSelector("end_col_offset"),
-    EdgeQLSelector("_module", PROJECT_SELECTION),
-]
-
-STATS_QUERY = as_edgeql(
-    EdgeQLSelect(
-        EdgeQLUnion.from_seq(
-            EdgeQLCall("count", [protected_name(node, prefix=True)])
-            for node in STATISTICS_NODES
+STATS_QUERY = IR.construct(
+    IR.select(
+        IR.merge(
+            IR.call("count", [IR.name(IR.wrap(name))])
+            for name in STATISTICS_NODES
         )
     )
 )
@@ -73,62 +65,38 @@ def fetch(filename, **loc_data):
     with tokenize.open(CLEAN_DIRECTORY / filename) as file:
         source = file.read()
 
-    if loc_data:
-        loc_node = LocationNode(**loc_data)
-        return ast.get_source_segment(source, loc_node, padded=True)
-    else:
-        return source
+    loc_node = LocationNode(**loc_data)
+    return ast.get_source_segment(source, loc_node, padded=True)
 
 
-def _get_query(reiz_ql, limit, offset, *, extra_filters=()):
+def compile_query(reiz_ql, limit, offset):
     tree = parse_query(reiz_ql)
-    logger.debug("ReizQL Tree: %r", tree)
 
-    selection = compile_edgeql(tree)
+    selection = compile_to_ir(tree)
     if limit is not None:
         selection.limit = limit
-
     if offset > 0:
         selection.offset = offset
 
-    if tree.positional:
-        selection.selections.extend(POSITION_SELECTION)
-    elif tree.name == "Module":
-        selection.selections.extend(PROJECT_SELECTION)
-    else:
-        raise ReizQLSyntaxError(f"Unexpected root matcher: {tree.name}")
-
-    for extra_filter in extra_filters:
-        selection.filters = merge_filters(selection.filters, extra_filter)
-
-    query = as_edgeql(selection)
-    logger.debug("EdgeQL query: %r", query)
-    return query, tree.positional
+    selection.selections.extend(POSITION_SELECTION)
+    return selection
 
 
-def _process_query_set(query_set, is_tree_positional, include_positions=False):
+def process_queryset(query_set):
     results = []
     for result in query_set:
-        loc_data = {}
-        if is_tree_positional:
-            module = result._module
-            github_link = (
-                infer_github_url(module)
-                + f"#L{result.lineno}-L{result.end_lineno}"
-            )
-            loc_data.update(
-                {
-                    "filename": module.filename,
-                    "lineno": result.lineno,
-                    "col_offset": result.col_offset,
-                    "end_lineno": result.end_lineno,
-                    "end_col_offset": result.end_col_offset,
-                }
-            )
-        else:
-            module = result
-            github_link = infer_github_url(result)
-            loc_data.update({"filename": result.filename})
+        module = result._module
+        github_link = (
+            infer_github_url(module)
+            + f"#L{result.lineno}-L{result.end_lineno}"
+        )
+        loc_data = {
+            "filename": module.filename,
+            "lineno": result.lineno,
+            "col_offset": result.col_offset,
+            "end_lineno": result.end_lineno,
+            "end_col_offset": result.end_col_offset,
+        }
 
         try:
             source = fetch(**loc_data)
@@ -139,13 +107,9 @@ def _process_query_set(query_set, is_tree_positional, include_positions=False):
             "repo": module.project.git_source,
             "username": get_username(module.project.git_source),
             "source": source,
-            "filename": loc_data["filename"],
             "github_link": github_link,
+            **loc_data,
         }
-
-        if include_positions:
-            result.update(loc_data)
-
         results.append(result)
 
     return results
@@ -157,11 +121,10 @@ def run_query_on_connection(
     *,
     limit=DEFAULT_LIMIT,
     offset=0,
-    include_positions=False,
 ):
-    query, is_tree_positional = _get_query(reiz_ql, limit, offset)
+    query = IR.construct(compile_query(reiz_ql, limit, offset))
     query_set = connection.query(query)
-    return _process_query_set(query_set, is_tree_positional, include_positions)
+    return process_queryset(query_set)
 
 
 async def run_query_on_async_connection(
@@ -172,12 +135,12 @@ async def run_query_on_async_connection(
     offset=0,
     loop=None,
     timeout=config.web.timeout,
-    include_positions=False,
 ):
-    query, is_tree_positional = _get_query(reiz_ql, limit, offset)
-    coroutine = connection.query(query)
-    query_set = await asyncio.wait_for(coroutine, timeout=timeout, loop=loop)
-    return _process_query_set(query_set, is_tree_positional, include_positions)
+    query = IR.construct(compile_query(reiz_ql, limit, offset))
+    query_set = await asyncio.wait_for(
+        connection.query(query), timeout=timeout, loop=loop
+    )
+    return process_queryset(query_set)
 
 
 def run_query(reiz_ql, limit=DEFAULT_LIMIT):

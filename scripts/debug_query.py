@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 from argparse import ArgumentParser, FileType
-from pprint import pprint
 
-from reiz.edgeql import as_edgeql
-from reiz.reizql import compile_edgeql, parse_query
+from reiz.ir import IR
+from reiz.reizql import compile_to_ir, parse_query
+from reiz.utilities import pprint
 
 
 def main():
@@ -19,8 +19,9 @@ def main():
     with options.source:
         query = parse_query(options.source.read())
         pprint(query)
-        edgeql = compile_edgeql(query)
-        print(as_edgeql(edgeql))
+
+        ir = compile_to_ir(query)
+        print(IR.construct(ir, top_level=True))
 
 
 if __name__ == "__main__":

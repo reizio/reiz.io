@@ -1,13 +1,6 @@
 import ast
 
-from reiz.edgeql.schema import (
-    ATOMIC_TYPES,
-    ENUM_TYPES,
-    MODULE_ANNOTATED_TYPES,
-    TAG_EXCLUDED_FIELDS,
-)
-
-BASIC_TYPES = ENUM_TYPES + ATOMIC_TYPES
+from reiz.ir import Schema
 
 
 def iter_attributes(node):
@@ -34,7 +27,7 @@ def annotate_ast_types(node_type, base=None, last_id=0):
     for sub_node_type in node_type.__subclasses__():
         sub_node_type.kind_name = sub_node_type.__name__
         sub_node_type.base_name = base or sub_node_type.kind_name
-        sub_node_type.is_enum = issubclass(sub_node_type, ENUM_TYPES)
+        sub_node_type.is_enum = issubclass(sub_node_type, Schema.enum_types)
         sub_node_type.type_id = last_id
         last_id = annotate_ast_types(
             sub_node_type, base=sub_node_type.kind_name, last_id=last_id + 1
@@ -50,7 +43,7 @@ def calculate_expr_tag(node):
 
     tag = [node.type_id]
     for field, value in ast.iter_fields(node):
-        if field in TAG_EXCLUDED_FIELDS:
+        if field in Schema.tag_excluded_fields:
             continue
 
         if isinstance(value, ast.AST) or value is None:
@@ -86,7 +79,7 @@ alter_ast(ast.Module, "_fields", "filename")
 alter_ast(ast.Module, "_fields", "project")
 alter_ast(ast.slice, "_attributes", "sentinel")
 alter_ast(ast.expr, "_attributes", "tag")
-for sum_type in MODULE_ANNOTATED_TYPES:
+for sum_type in Schema.module_annotated_types:
     alter_ast(sum_type, "_attributes", "_module")
 
 
@@ -152,9 +145,5 @@ def infer_base(node):
         return node_type.__base__
 
 
-def prepare_ast(tree):
-    tree = QLAst.visit(tree)
-    return tree
-
-
+prepare_ast = QLAst.visit
 annotate_ast_types(ast.AST)

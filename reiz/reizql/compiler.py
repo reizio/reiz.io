@@ -8,8 +8,7 @@ from functools import singledispatch
 from types import SimpleNamespace
 from typing import Any, ClassVar, Counter, Dict, List, Optional
 
-from reiz.edgeql import *
-from reiz.edgeql.schema import protected_name
+from reiz.ir import IR
 from reiz.reizql.field_db import FIELD_DB
 from reiz.reizql.nodes import *
 from reiz.reizql.parser import ReizQLSyntaxError
@@ -82,13 +81,13 @@ class Scope:
 @dataclass(unsafe_hash=True)
 class CompilerState:
     match: str
-
     depth: int = 0
-    _pointer: Optional[str] = None
 
     scope: Scope = field(default_factory=Scope)
     properties: Dict[str, Any] = field(default_factory=dict)
     parents: List[CompilerState] = field(default_factory=list, repr=False)
+
+    field: Optional[str] = None
 
     freeze = deepcopy
 
@@ -116,12 +115,12 @@ class CompilerState:
 
     @contextmanager
     def temp_pointer(self, pointer):
-        _old_pointer = self._pointer
+        _old_pointer = self.field
         try:
-            self._pointer = pointer
+            self.field = pointer
             yield
         finally:
-            self._pointer = _old_pointer
+            self.field = _old_pointer
 
     @contextmanager
     def temp_flag(self, flag, value=True):
@@ -144,15 +143,26 @@ class CompilerState:
     set_property = set_flag
     temp_property = temp_flag
 
-    def compile(self, key, value):
-        self._pointer = key
-        if query := codegen(value, self):
-            return self.as_query(query)
+    def compute_path(self):
+        base = None
+        for parent in self.get_ordered_parents():
+            if base is None:
+                if self.can_raw_name_access:
+                    base = parent.pointer
+                else:
+                    base = IR.attribute(None, parent.pointer)
+            else:
+                base = IR.attribute(
+                    IR.typed(base, parent.match), parent.pointer
+                )
+        return base
 
-    def as_query(self, query):
-        if not is_edgeql_filter_expr(real_object(query)):
-            query = EdgeQLFilter(generate_type_checked_key(self), query)
-        return query
+    def compile(self, key, value):
+        with self.temp_pointer(key):
+            return self.codegen(value)
+
+    def codegen(self, node):
+        return codegen(node, self)
 
     def get_ordered_parents(self):
         parents = self.parents + [self]
@@ -170,7 +180,7 @@ class CompilerState:
         return parents[index:]
 
     def as_unique_ref(self, prefix):
-        return f"{prefix}_{uuid.uuid4().hex[:8]}"
+        return IR.name(f"{prefix}_{uuid.uuid4().hex[:8]}")
 
     @property
     def can_raw_name_access(self):
@@ -178,38 +188,11 @@ class CompilerState:
 
     @property
     def pointer(self):
-        return protected_name(self._pointer, prefix=False)
+        return IR.wrap(self.field, with_prefix=False)
 
     @property
     def field_info(self):
-        return FIELD_DB[self.match][self._pointer]
-
-
-def generate_type_checked_key(state):
-    base = None
-    for parent in state.get_ordered_parents():
-        if base is None:
-            if state.can_raw_name_access:
-                base = parent.pointer
-            else:
-                base = EdgeQLFilterKey(parent.pointer)
-        else:
-            base = EdgeQLAttribute(
-                type_check(base, parent.match), parent.pointer
-            )
-    return base
-
-
-def type_check(key, expected_type, inline=True):
-    if inline:
-        constructor = EdgeQLVerify
-        operator = EdgeQLVerifyOperator.IS
-    else:
-        constructor = EdgeQLFilter
-        operator = EdgeQLComparisonOperator.IDENTICAL
-    return constructor(
-        key, protected_name(expected_type, prefix=True), operator
-    )
+        return FIELD_DB[self.match][self.field]
 
 
 @singledispatch
@@ -230,56 +213,64 @@ def compile_matcher(node, state):
             continue
 
         if right_filter := state.compile(key, value):
-            filters = merge_filters(filters, right_filter)
+            filters = IR.combine_filters(filters, right_filter)
 
     if state.is_root:
         state.scope.exit()
-        return EdgeQLSelect(state.match, filters=filters)
-    else:
-        if filters is None:
-            key = generate_type_checked_key(state.parents[-1])
-            filters = type_check(key, state.match, inline=False)
-        return filters
+        return IR.select(state.match, filters=filters)
+
+    if filters is None:
+        filters = IR.filter(
+            state.parents[-1].compute_path(), IR.wrap(state.match), "IS"
+        )
+
+    return filters
 
 
 @codegen.register(ReizQLMatchEnum)
 def convert_match_enum(node, state):
-    return EdgeQLCast(protected_name(node.base, prefix=True), repr(node.name))
+    expr = IR.enum_member(node.base, node.name)
+    return IR.filter(state.compute_path(), expr, "=")
 
 
 @codegen.register(ReizQLConstant)
 def compile_constant(node, state):
-    return EdgeQLPreparedQuery(str(node.value))
+    expr = IR.literal(node.value)
+
+    # Constants are represented as repr(obj) in the
+    # serialization part, so we have to re-cast it.
+    if state.match == "Constant":
+        expr.value = repr(expr.value)
+
+    return IR.filter(state.compute_path(), expr, "=")
 
 
 @codegen.register(ReizQLMatchString)
 def compile_match_string(node, state):
-    return EdgeQLFilter(
-        generate_type_checked_key(state),
-        codegen(node.value, state),
-        EdgeQLComparisonOperator.LIKE,
-    )
+    expr = IR.literal(node.value)
+    return IR.filter(state.compute_path(), expr, "LIKE")
 
 
 @codegen.register(ReizQLNot)
 def compile_operator_flip(node, state):
-    filters = state.as_query(codegen(node.value, state))
-    return EdgeQLGroup(EdgeQLNot(EdgeQLGroup(filters)))
+    return IR.negate(state.codegen(node.value))
 
 
 @codegen.register(ReizQLLogicalOperation)
 def convert_logical_operation(node, state):
-    left = state.as_query(codegen(node.left, state))
-    right = state.as_query(codegen(node.right, state))
-    return EdgeQLFilterChain(left, right, codegen(node.operator, state))
+    return IR.filter(
+        state.codegen(node.left),
+        state.codegen(node.right),
+        state.codegen(node.operator),
+    )
 
 
 @codegen.register(ReizQLLogicOperator)
 def convert_logical_operator(node, state):
     if node is ReizQLLogicOperator.OR:
-        return EdgeQLLogicOperator.OR
+        return IR.as_operator("OR")
     elif node is ReizQLLogicOperator.AND:
-        return EdgeQLLogicOperator.AND
+        return IR.as_operator("AND")
 
 
 @codegen.register(ReizQLRef)
@@ -293,12 +284,12 @@ def compile_reference(node, state):
                 f"{node.name} expects {expected_type.__name__!r} got {obtained_type.__name__!r}"
             )
 
-        left = generate_type_checked_key(state)
-        right = generate_type_checked_key(pointer)
+        left = state.compute_path()
+        right = pointer.compute_path()
         if issubclass(expected_type, ast.expr):
-            left = EdgeQLAttribute(left, "tag")
-            right = EdgeQLAttribute(right, "tag")
-        return EdgeQLFilter(left, right)
+            left = IR.attribute(left, "tag")
+            right = IR.attribute(right, "tag")
+        return IR.filter(left, right, "=")
     else:
         if not issubclass(obtained_type, (str, int, ast.expr)):
             raise ReizQLSyntaxError(
@@ -310,10 +301,10 @@ def compile_reference(node, state):
 @codegen.register(ReizQLList)
 def compile_sequence(node, state):
     total_length = len(node.items)
-    length_verifier = EdgeQLFilter(
-        EdgeQLCall("count", [generate_type_checked_key(state)]),
-        total_length,
+    length_verifier = IR.filter(
+        IR.call("count", [state.compute_path()]), total_length, "="
     )
+
     if total_length == 0 or all(  # Empty list
         item in (ReizQLIgnore, ReizQLExpand) for item in node.items
     ):  # Length matching
@@ -324,37 +315,34 @@ def compile_sequence(node, state):
             raise ReizQLSyntaxError(
                 "Can't use multiple expansion macros in one sequence"
             )
-        length_verifier.value -= total
-        length_verifier.operator = EdgeQLComparisonOperator.GTE
+        length_verifier = IR.filter(
+            IR.call("count", [state.compute_path()]), total_length - 1, ">="
+        )
 
     array_ref = state.as_unique_ref("_sequence")
 
     # If we are in a nested list search (e.g: Call(args=[Call(args=[Name()])]))
     # we can't directly use `ORDER BY @index` since the EdgeDB can't quite infer
     # which @index are we talking about.
+
+    # a part of this section should go under the IRBuilder
     if state.is_flag_set("in for loop"):
-        original_matcher = generate_type_checked_key(state.parents[-1])
-        type_checked_sequence = EdgeQLAttribute(
-            type_check(
-                EdgeQLName(_COMPILER_WORKAROUND_FOR_TARGET), state.match
-            ),
+        type_checked_sequence = IR.attribute(
+            IR.typed(IR.name(_COMPILER_WORKAROUND_FOR_TARGET), state.match),
             state.pointer,
         )
-        unpacked_list = EdgeQLFor(
-            _COMPILER_WORKAROUND_FOR_TARGET,
-            EdgeQLSet([original_matcher]),
-            EdgeQLSelect(
-                type_checked_sequence,
-                ordered=EdgeQLProperty("index"),
-            ),
+        unpacked_list = IR.loop(
+            IR.name(_COMPILER_WORKAROUND_FOR_TARGET),
+            state.parents[-1].compute_path(),
+            IR.select(type_checked_sequence, order=IR.property("index")),
         )
     else:
-        unpacked_list = EdgeQLSelect(
-            generate_type_checked_key(state), ordered=EdgeQLProperty("index")
+        unpacked_list = IR.select(
+            state.compute_path(), order=IR.property("index")
         )
 
-    unpacked_array = EdgeQLCall("array_agg", [unpacked_list])
-    scope = EdgeQLWithBlock({array_ref: unpacked_array})
+    unpacked_array = IR.call("array_agg", [unpacked_list])
+    scope = IR.namespace({array_ref: unpacked_array})
 
     expansion_seen = False
     with state.temp_flag("in for loop"), state.temp_property(
@@ -377,15 +365,18 @@ def compile_sequence(node, state):
             if expansion_seen:
                 position = -(total_length - position)
 
-            with state.temp_pointer(
-                EdgeQLSubscript(EdgeQLName(array_ref), position)
-            ):
-                filters = merge_filters(filters, codegen(matcher, state))
+            with state.temp_pointer(IR.subscript(array_ref, position)):
+                filters = IR.combine_filters(filters, state.codegen(matcher))
 
         assert filters is not None
-        object_verifier = EdgeQLSelect(filters, with_block=scope)
+        object_verifier = IR.add_namespace(scope, IR.select(filters))
 
-    return merge_filters(length_verifier, object_verifier)
+    return IR.combine_filters(length_verifier, object_verifier)
+
+
+@codegen.register(type(ReizQLNone))
+def convert_none(node, state):
+    return IR.negate(IR.exists(state.compute_path()))
 
 
 @dataclass
@@ -442,21 +433,19 @@ def builtin_type_error(func, expected):
 
 @Signature.register("I", ["match_str"])
 def convert_intensive(node, state, arguments):
+    match_str = arguments.match_str
     if not isinstance(arguments.match_str, ReizQLMatchString):
         raise ReizQLSyntaxError(f"I only accepts match strings")
 
-    return EdgeQLFilter(
-        generate_type_checked_key(state),
-        codegen(arguments.match_str.value, state),
-        EdgeQLComparisonOperator.ILIKE,
+    return IR.filter(
+        state.compute_path(), IR.literal(match_str.value), "ILIKE"
     )
 
 
 @Signature.register("ALL", ["value"])
 @Signature.register("ANY", ["value"])
 def convert_all_any(node, state, arguments):
-    query = codegen(arguments.value, state)
-    return as_edgeql_filter_expr(EdgeQLCall(node.name.lower(), [query]))
+    return IR.call(node.name.lower(), [state.codegen(arguments.value)])
 
 
 @Signature.register("LEN", ["min", "max"], {"min": None, "max": None})
@@ -464,11 +453,11 @@ def convert_length(node, state, arguments):
     if arguments.min is None and arguments.max is None:
         raise ReizQLSyntaxError("'LEN' requires at least 1 argument")
 
-    count = EdgeQLCall("count", [generate_type_checked_key(state)])
+    count = IR.call("count", [state.compute_path()])
     filters = None
     for value, operator in [
-        (arguments.min, EdgeQLComparisonOperator.GTE),
-        (arguments.max, EdgeQLComparisonOperator.LTE),
+        (arguments.min, IR.as_operator(">=")),
+        (arguments.max, IR.as_operator("<=")),
     ]:
         if value is None:
             continue
@@ -481,8 +470,8 @@ def convert_length(node, state, arguments):
         except ValueError:
             builtin_type_error("LEN", "integers")
 
-        filters = merge_filters(
-            filters, EdgeQLFilter(count, EdgeQLPreparedQuery(value), operator)
+        filters = IR.combine_filters(
+            filters, IR.filter(count, IR.literal(value), operator)
         )
 
     assert filters is not None
@@ -498,12 +487,5 @@ def convert_call(node, state):
     return signature.codegen(node, state)
 
 
-@codegen.register(type(ReizQLNone))
-def convert_none(node, state):
-    return EdgeQLNot(
-        as_edgeql_filter_expr(EdgeQLExists(generate_type_checked_key(state)))
-    )
-
-
-def compile_edgeql(node):
+def compile_to_ir(node):
     return codegen(node, None)
