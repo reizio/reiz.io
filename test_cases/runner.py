@@ -244,9 +244,7 @@ def run_tests(allow_fail):
             except ExpectationFailed:
                 if test_case.name not in allow_fail:
                     fail = True
-                logger.info(
-                    "%s's query: %r", test_case.name, test_case.compile_query()
-                )
+                print(test_case.compile_query())
                 logger.info("%s %s", test_case.name, "failed")
             else:
                 logger.info("%s %s", test_case.name, "succeed")
@@ -269,7 +267,7 @@ def main(argv=None):
     parser.add_argument("--change-db-schema", action="store_true")
     parser.add_argument("--run-benchmarks", action="store_true")
     parser.add_argument("--start-edgedb-server", action="store_true")
-    parser.add_argument("--allow-fail", nargs="+")
+    parser.add_argument("--allow-fail", nargs="+", default=frozenset())
     options = parser.parse_args(argv)
 
     setup(

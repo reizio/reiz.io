@@ -96,4 +96,6 @@ def json_request(url):
     return json.loads(request(url))
 
 
-singleton = object.__new__
+def singleton(cls):
+    cls.__repr__ = lambda self: type(self).__name__
+    return object.__new__(cls)

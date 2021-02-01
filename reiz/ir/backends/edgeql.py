@@ -153,10 +153,11 @@ class CompareOperation(ComplexExpression):
         self.construct_unpacked(state, Comparator.AND + " ")
 
     def _construct_simple(self, state):
-        state.view(self.left)
-        with state.between("  "):
-            state.view(self.operator)
-        state.view(self.right)
+        with state.between("()", condition=(self.operator is Comparator.OR)):
+            state.view(self.left)
+            with state.between("  "):
+                state.view(self.operator)
+            state.view(self.right)
 
 
 @dataclass

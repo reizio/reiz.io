@@ -2,55 +2,12 @@ import ast
 import functools
 
 from reiz.ir import IR
-from reiz.reizql.nodes import (
-    ReizQLBuiltin,
-    ReizQLConstant,
-    ReizQLExpand,
-    ReizQLIgnore,
-    ReizQLList,
-    ReizQLLogicalOperation,
-    ReizQLLogicOperator,
-    ReizQLMatch,
-    ReizQLMatchEnum,
-    ReizQLMatchString,
-    ReizQLNone,
-    ReizQLNot,
-    ReizQLRef,
-)
+from reiz.reizql.parser import ReizQLSyntaxError, grammar
 
 BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN", "I")
 POSITION_ATTRIBUTES = frozenset(
     ("lineno", "col_offset", "end_lineno", "end_col_offset")
 )
-
-
-class ReizQLSyntaxError(Exception):
-    @property
-    def message(self):
-        return self.args[0]
-
-    @property
-    def position(self):
-        if len(self.args) < 3:
-            return {}
-        else:
-            lineno, col_offset, end_lineno, end_col_offset = self.args[1:5]
-            return {
-                "lineno": lineno,
-                "col_offset": col_offset,
-                "end_lineno": end_lineno,
-                "end_col_offset": end_col_offset,
-            }
-
-    @classmethod
-    def from_node(cls, node, message):
-        return cls(
-            message,
-            node.lineno,
-            node.col_offset,
-            node.end_lineno,
-            node.end_col_offset,
-        )
 
 
 def ensure(condition, node=None, message="Invalid syntax"):
@@ -61,6 +18,7 @@ def ensure(condition, node=None, message="Invalid syntax"):
             raise ReizQLSyntaxError.from_node(node, message)
 
 
+@functools.lru_cache
 def is_valid_matcher(name):
     return hasattr(ast, name) or name in BUILTIN_FUNCTIONS
 
@@ -83,7 +41,7 @@ class Parser:
         )
 
         if name in BUILTIN_FUNCTIONS:
-            return ReizQLBuiltin(
+            return grammar.Builtin(
                 name,
                 [self.parse(arg) for arg in node.args],
                 {
@@ -99,7 +57,7 @@ class Parser:
             positional = False
 
         if issubclass(origin, IR.schema.enum_types):
-            return ReizQLMatchEnum(origin.__base__.__name__, name)
+            return grammar.MatchEnum(origin.__base__.__name__, name)
         else:
             query = {}
 
@@ -119,20 +77,20 @@ class Parser:
                 )
                 query[arg.arg] = self.parse(arg.value)
 
-            return ReizQLMatch(name, query, positional=positional)
+            return grammar.Match(name, query, positional=positional)
 
     @parse.register(ast.BinOp)
     def parse_binop(self, node):
         if isinstance(node.op, ast.BitOr):
-            operator = ReizQLLogicOperator.OR
+            operator = grammar.LogicOperator.OR
         elif isinstance(node.op, ast.BitAnd):
-            operator = ReizQLLogicOperator.AND
+            operator = grammar.LogicOperator.AND
         else:
             raise ReizQLSyntaxError.from_node(
                 node.op, f"Unknown logical operation: {type(node.op).__name__}"
             )
 
-        return ReizQLLogicalOperation(
+        return grammar.LogicalOperation(
             left=self.parse(node.left),
             right=self.parse(node.right),
             operator=operator,
@@ -141,23 +99,23 @@ class Parser:
     @parse.register(ast.Constant)
     def parse_constant(self, node):
         if node.value is Ellipsis:
-            return ReizQLIgnore
+            return grammar.Ignore
         elif node.value is None:
-            return ReizQLNone
+            return grammar.Cease
         else:
-            return ReizQLConstant(node.value)
+            return grammar.Constant(node.value)
 
     @parse.register(ast.List)
     def parse_list(self, node):
-        return ReizQLList([self.parse(item) for item in node.elts])
+        return grammar.List([self.parse(item) for item in node.elts])
 
     @parse.register(ast.UnaryOp)
     def parse_unary(self, node):
         if isinstance(node.op, ast.Not):
-            return ReizQLNot(self.parse(node.operand))
+            return grammar.Not(self.parse(node.operand))
         elif isinstance(node.op, ast.Invert):
             ensure(isinstance(node.operand, ast.Name))
-            return ReizQLRef(node.operand.id)
+            return grammar.Ref(node.operand.id)
         else:
             raise ReizQLSyntaxError.from_node(node, "unknown unary operator")
 
@@ -170,7 +128,7 @@ class Parser:
             ),
             node,
         )
-        return ReizQLExpand
+        return grammar.Expand
 
     @parse.register(ast.JoinedStr)
     def parse_match_string(self, node):
@@ -183,7 +141,7 @@ class Parser:
             node,
             "Empty match strings are not allowed",
         )
-        return ReizQLMatchString(original_source)
+        return grammar.MatchString(original_source)
 
 
 def parse_query(source):
@@ -202,27 +160,6 @@ def parse_query(source):
     parser = Parser(source)
     root_node = parser.parse(tree.body[0].value)
 
-    ensure(isinstance(root_node, ReizQLMatch), tree.body[0])
+    ensure(isinstance(root_node, grammar.Match), tree.body[0])
     ensure(root_node.positional, tree.body[0])
     return root_node
-
-
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "source",
-        type=argparse.FileType(mode="rb"),
-        nargs="?",
-        default="-",
-        help="the file to parse; defaults to stdin",
-    )
-    options = parser.parse_args()
-    tree = parse_query(options.source.read())
-    print(tree)
-    options.source.close()
-
-
-if __name__ == "__main__":
-    main()

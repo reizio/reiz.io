@@ -1,3 +1,3 @@
 from reiz.reizql.compiler import compile_to_ir
-from reiz.reizql.nodes import *
-from reiz.reizql.parser import ReizQLSyntaxError, parse_query
+from reiz.reizql.parser import ReizQLSyntaxError
+from reiz.reizql.parser.parse import parse_query
