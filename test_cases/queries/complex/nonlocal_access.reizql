@@ -1,0 +1,15 @@
+FunctionDef(
+    name = ~name,
+    decorator_list = [
+        Name(~name)
+    ],
+    body = [
+        Call(Name(~name)),
+        If(
+            body = [
+                Expr(~some_expr)
+            ]
+        ),
+        Return(~some_expr)
+    ]
+)

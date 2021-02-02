@@ -514,4 +514,6 @@ class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
     property = Property
     subscript = Subscript
     selection = Selection
+    statement = Statement
+    expression = Expression
     add_namespace = WrappedStatement

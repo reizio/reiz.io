@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from functools import singledispatch
 
 from reiz.ir import IR
@@ -35,6 +34,9 @@ def compile_matcher(node, state):
 
     if state.is_root:
         state.scope.exit()
+        if state.variables:
+            namespace = IR.namespace(state.variables)
+            filters = IR.add_namespace(namespace, IR.select(filters))
         return IR.select(state.match, filters=filters)
 
     if filters is None:
@@ -109,7 +111,27 @@ def compile_reference(node, state):
         return IR.filter(left, right, "=")
 
     state.ensure(node, issubclass(obtained_type, (str, int, ast.expr)))
-    state.scope.define(node.name, state)
+    state.scope.define(node.name, state.copy())
+
+
+def aggregate_array(state):
+    # If we are in a nested list search (e.g: Call(args=[Call(args=[Name()])]))
+    # we can't directly use `ORDER BY @index` since the EdgeDB can't quite infer
+    # which @index are we talking about.
+    if state.is_flag_set("in for loop"):
+        path = IR.attribute(
+            IR.typed(IR.name(_COMPILER_WORKAROUND_FOR_TARGET), state.match),
+            state.pointer,
+        )
+        body = IR.loop(
+            IR.name(_COMPILER_WORKAROUND_FOR_TARGET),
+            state.parents[-1].compute_path(),
+            IR.select(path, order=IR.property("index")),
+        )
+    else:
+        body = IR.select(state.compute_path(), order=IR.property("index"))
+
+    return IR.call("array_agg", [body])
 
 
 @codegen.register(grammar.List)
@@ -130,28 +152,8 @@ def compile_sequence(node, state):
             IR.call("count", [state.compute_path()]), total_length - 1, ">="
         )
 
-    array_ref = IR.name(f"sequence_{uuid.uuid4().hex[:8]}")
-
-    # If we are in a nested list search (e.g: Call(args=[Call(args=[Name()])]))
-    # we can't directly use `ORDER BY @index` since the EdgeDB can't quite infer
-    # which @index are we talking about.
-    if state.is_flag_set("in for loop"):
-        type_checked_sequence = IR.attribute(
-            IR.typed(IR.name(_COMPILER_WORKAROUND_FOR_TARGET), state.match),
-            state.pointer,
-        )
-        unpacked_list = IR.loop(
-            IR.name(_COMPILER_WORKAROUND_FOR_TARGET),
-            state.parents[-1].compute_path(),
-            IR.select(type_checked_sequence, order=IR.property("index")),
-        )
-    else:
-        unpacked_list = IR.select(
-            state.compute_path(), order=IR.property("index")
-        )
-
-    unpacked_array = IR.call("array_agg", [unpacked_list])
-    scope = IR.namespace({array_ref: unpacked_array})
+    array_ref = IR.new_reference("sequence")
+    state.variables[array_ref] = aggregate_array(state)
 
     expansion_seen = False
     with state.temp_flag("in for loop"), state.temp_property(
@@ -172,10 +174,8 @@ def compile_sequence(node, state):
             with state.temp_pointer(IR.subscript(array_ref, position)):
                 filters = IR.combine_filters(filters, state.codegen(matcher))
 
-        assert filters is not None
-        object_verifier = IR.add_namespace(scope, IR.select(filters))
-
-    return IR.combine_filters(length_verifier, object_verifier)
+    assert filters is not None
+    return IR.combine_filters(length_verifier, filters)
 
 
 @codegen.register(type(grammar.Cease))

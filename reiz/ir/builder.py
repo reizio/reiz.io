@@ -1,3 +1,5 @@
+import uuid
+
 from reiz.ir.printer import IRPrinter
 from reiz.schema import BaseSchema
 
@@ -52,6 +54,12 @@ class IRBuilder:
 
     def query(self, key):
         return self.construct(self.PREPARED_QUERIES.get(key))
+
+    def new_reference(self, category=None):
+        name = str(uuid.uuid4().hex[:8])
+        if category:
+            name = f"{category}_{name}"
+        return self.name(name)
 
 
 def get_ir_builder(backend_name):

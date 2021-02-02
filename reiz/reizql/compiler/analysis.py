@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Counter, Dict, List
+from typing import Counter, Dict, List, Tuple
 
 from reiz.reizql.parser import ReizQLSyntaxError
 
@@ -37,31 +37,39 @@ class Scope:
     #  )
 
     parents: List[Scope] = field(default_factory=list)
-    definitions: Dict[str, CompilerState] = field(default_factory=dict)
+    definitions: Dict[str, Tuple[Scope, CompilerState]] = field(
+        default_factory=dict
+    )
     reference_counts: Counter[str] = field(default_factory=Counter)
 
     @classmethod
     def from_parent(cls, parent):
-        return cls(parents=parent.parents + [parent])
+        return cls(
+            parents=parent.parents + [parent], definitions=parent.definitions
+        )
 
     def lookup(self, name):
-        for scope in reversed(self.parents + [self]):
-            if state := scope.definitions.get(name):
-                scope.reference(name)
-                return state
-        else:
+        if name not in self.definitions:
             return None
+
+        scope, state = self.definitions[name]
+        scope.reference(name)
+        state.set_flag("linear access", scope not in self.parents + [self])
+        return state
 
     def reference(self, name):
         self.reference_counts[name] += 1
 
     def define(self, name, state):
-        self.definitions[name] = state.freeze()
+        self.definitions[name] = (self, state)
 
     def exit(self):
-        for definition in self.definitions:
-            if self.reference_counts[definition] < 1:
-                raise ReizQLSyntaxError(f"Unused reference: {definition!r}")
-
         if len(self.parents) >= 1:
             return self.parents[-1]
+        else:
+            self.verify()
+
+    def verify(self):
+        for definition, (scope, _) in self.definitions.items():
+            if scope.reference_counts[definition] < 1:
+                raise ReizQLSyntaxError(f"unused reference: {definition!r}")

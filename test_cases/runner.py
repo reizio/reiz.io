@@ -239,6 +239,7 @@ def run_tests(allow_fail):
     fail = False
     with get_new_connection() as connection:
         for test_case in collect_tests():
+            logger.info("case: %s", test_case.name)
             try:
                 test_case.execute(connection)
             except ExpectationFailed:

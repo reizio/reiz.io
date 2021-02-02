@@ -1,0 +1,26 @@
+FunctionDef(
+    decorator_list=[Name()],
+    body=[
+        FunctionDef(
+            decorator_list=[
+                Call(
+                    args=[
+                        Call(
+                            args=[
+                                Name()
+                            ]
+                        ),
+                        Name(),
+                    ]
+                )
+            ]
+        ),
+        If(
+            body=[
+                For(
+                    body=[Return(Call(args=[]))]
+                )
+            ]
+        ),
+    ],
+)

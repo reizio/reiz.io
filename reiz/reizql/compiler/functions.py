@@ -9,7 +9,7 @@ from reiz.reizql.parser import grammar
 
 if TYPE_CHECKING:
     BuiltinFunctionType = Callable[
-        [grammar.Expression, CompilerState, SimpleNamespace], IR
+        [grammar.Expression, CompilerState, SimpleNamespace], IR.expression
     ]
 
 

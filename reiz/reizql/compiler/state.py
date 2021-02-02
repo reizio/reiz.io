@@ -19,12 +19,15 @@ class CompilerState:
 
     field: Optional[str] = None
     scope: Scope = dataclass_field(default_factory=Scope)
+    variables: Dict[IR.name, IR.expression] = dataclass_field(
+        default_factory=dict
+    )
     properties: Dict[str, Any] = dataclass_field(default_factory=dict)
     parents: List[CompilerState] = dataclass_field(
         default_factory=list, repr=False
     )
 
-    freeze = deepcopy
+    copy = deepcopy
 
     @classmethod
     def from_parent(cls, name, parent):
@@ -33,6 +36,7 @@ class CompilerState:
             depth=parent.depth + 1,
             scope=parent.scope,
             parents=parent.parents + [parent],
+            variables=parent.variables,
             properties=parent.properties,
         )
 
@@ -87,10 +91,13 @@ class CompilerState:
             return self.codegen(value)
 
     def compute_path(self):
+        if self.get_property("linear access"):
+            assert False
+
         base = None
         for parent in self.get_ordered_parents():
             if base is None:
-                if self.can_raw_name_access:
+                if self.is_flag_set("in for loop"):
                     base = parent.pointer
                 else:
                     base = IR.attribute(None, parent.pointer)
@@ -128,7 +135,7 @@ class CompilerState:
 
     @property
     def can_raw_name_access(self):
-        return self.is_flag_set("in for loop")
+        return
 
     @property
     def pointer(self):
