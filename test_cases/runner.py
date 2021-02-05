@@ -239,17 +239,18 @@ def run_tests(allow_fail):
     fail = False
     with get_new_connection() as connection:
         for test_case in collect_tests():
-            logger.info("case: %s", test_case.name)
             try:
                 test_case.execute(connection)
             except ExpectationFailed:
-                if test_case.name not in allow_fail:
-                    fail = True
-                print(test_case.compile_query())
-                logger.info("%s %s", test_case.name, "failed")
+                logger.info("%r failed", test_case.name)
+            except Exception:
+                logger.exception("%r terminated", test_case.name)
             else:
-                logger.info("%s %s", test_case.name, "succeed")
+                logger.info("%r succeed", test_case.name)
+                continue
 
+            if test_case.name not in allow_fail:
+                fail = True
     return fail
 
 
