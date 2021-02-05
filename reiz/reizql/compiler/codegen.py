@@ -167,15 +167,17 @@ def compile_sequence(node, state):
                 expansion_seen = True
                 continue
 
-            state.ensure(matcher, isinstance(matcher, grammar.Match))
             if expansion_seen:
                 position = -(total_length - position)
 
             with state.temp_pointer(IR.subscript(array_ref, position)):
-                filters = IR.combine_filters(filters, state.codegen(matcher))
+                if item_filters := state.codegen(matcher):
+                    filters = IR.combine_filters(filters, item_filters)
 
-    assert filters is not None
-    return IR.combine_filters(length_verifier, filters)
+        if filters:
+            return IR.combine_filters(length_verifier, filters)
+        else:
+            return length_verifier
 
 
 @codegen.register(type(grammar.Cease))

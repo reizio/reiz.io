@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from copy import deepcopy
-from dataclasses import dataclass
-from dataclasses import field as dataclass_field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 
 from reiz.ir import IR
 from reiz.reizql.compiler.analysis import Scope
@@ -17,15 +16,11 @@ class CompilerState:
     match: str
     depth: int = 0
 
-    field: Optional[str] = None
-    scope: Scope = dataclass_field(default_factory=Scope)
-    variables: Dict[IR.name, IR.expression] = dataclass_field(
-        default_factory=dict
-    )
-    properties: Dict[str, Any] = dataclass_field(default_factory=dict)
-    parents: List[CompilerState] = dataclass_field(
-        default_factory=list, repr=False
-    )
+    pointer_stack: List[str] = field(default_factory=list)
+    scope: Scope = field(default_factory=Scope)
+    variables: Dict[IR.name, IR.expression] = field(default_factory=dict)
+    properties: Dict[str, Any] = field(default_factory=dict)
+    parents: List[CompilerState] = field(default_factory=list, repr=False)
 
     copy = deepcopy
 
@@ -58,12 +53,11 @@ class CompilerState:
 
     @contextmanager
     def temp_pointer(self, pointer):
-        _old_pointer = self.field
+        self.pointer_stack.append(pointer)
         try:
-            self.field = pointer
             yield
         finally:
-            self.field = _old_pointer
+            self.pointer_stack.pop()
 
     @contextmanager
     def temp_flag(self, flag, value=True):
@@ -91,9 +85,6 @@ class CompilerState:
             return self.codegen(value)
 
     def compute_path(self):
-        if self.get_property("linear access"):
-            assert False
-
         base = None
         for parent in self.get_ordered_parents():
             if base is None:
@@ -139,8 +130,8 @@ class CompilerState:
 
     @property
     def pointer(self):
-        return IR.wrap(self.field, with_prefix=False)
+        return IR.wrap(self.pointer_stack[-1], with_prefix=False)
 
     @property
     def field_info(self):
-        return FIELD_DB[self.match][self.field]
+        return FIELD_DB[self.match][self.pointer_stack[0]]
