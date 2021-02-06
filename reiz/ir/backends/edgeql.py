@@ -108,6 +108,9 @@ class Comparator(str, Operator):
     NOT_LIKE = "NOT LIKE"
     NOT_ILIKE = "NOT ILIKE"
 
+    # Bitwise
+    BITWISE_OR = "|"
+
 
 @dataclass
 class UnaryOperation(Expression):
@@ -278,11 +281,11 @@ class Subscript(Expression):
 
 @dataclass
 class Call(Expression):
-    func: str
+    func: EQL
     args: List[EQL]
 
     def construct(self, state):
-        state.write(self.func)
+        state.view(self.func)
         with state.between("()"):
             state.sequence_view(self.args)
 
@@ -320,11 +323,11 @@ class Assign(Expression):
 
 @dataclass
 class Selection(Unit):
-    selector: str
+    selector: EQL
     selectors: List[Selection] = field(default_factory=list)
 
     def construct(self, state):
-        state.write(self.selector)
+        state.view(self.selector)
         if self.selectors:
             state.write(": ")
             with state.between("{}"):
@@ -353,12 +356,12 @@ class WrappedStatement(Statement):
 
 @dataclass
 class Insert(Statement):
-    model: str
+    model: EQL
     body: List[EQL] = field(default_factory=list)
 
     def construct(self, state):
         state.write("INSERT ")
-        state.write(self.model)
+        state.view(self.model)
 
         with state.between("{}", condition=self.body):
             state.sequence_view(self.body)
@@ -402,13 +405,13 @@ class Select(Statement):
 
 @dataclass
 class Update(Statement):
-    model: str
+    model: EQL
     filters: Expression = None
     body: List[EQL] = field(default_factory=list)
 
     def construct(self, state):
         state.write("UPDATE ")
-        state.write(self.model)
+        state.view(self.model)
         if self.filters:
             state.write(" FILTER ")
             state.view(self.filters)
@@ -439,9 +442,20 @@ class EQLOptimizer(IROptimizer):
     def visit(self, node):
         self.generic_visit(node)
 
-    @visit.register(EQLCompareOperation)
+    @visit.register(CompareOperation)
     def visit_compare_operation(self, node):
-        print(node)
+        if node.operator is Comparator.OR:
+            self.optimize_type_or(node)
+
+        self.generic_visit(node)
+
+    @IROptimizer.guarded
+    def optimize_type_or(self, node):
+        self.ensure(isinstance(node.left, CompareOperation))
+        self.ensure(isinstance(node.right, CompareOperation))
+        self.ensure(node.left.operator is Comparator.IDENTICAL)
+        self.ensure(node.right.operator is Comparator.IDENTICAL)
+        self.ensure(node.left.left == node.right.left)
 
 
 class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
@@ -451,9 +465,14 @@ class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
 
     def wrap(self, key, with_prefix=True):
         if isinstance(key, str):
-            return self.schema.wrap(key, with_prefix=with_prefix)
-        else:
-            return key
+            key = self.schema.wrap(key, with_prefix=False)
+            if with_prefix:
+                # We don't know whether the key is request for an attribute access
+                # or not, so we have to keep it as string. But in case of the prefix
+                # is requested, this is definietly a type access, so we are safe to
+                # wrap it as an IRObject.
+                key = self.from_namespace(self.schema.NAMESPACE, key)
+        return key
 
     def select(self, model, **kwargs):
         if isinstance(model, str):
@@ -531,3 +550,4 @@ class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
     statement = Statement
     expression = Expression
     add_namespace = WrappedStatement
+    from_namespace = NamespaceAttribute
