@@ -7,6 +7,9 @@ class IROptimizer:
     def visit(self, node):
         raise NotImplementedError
 
+    def optimize(self, node):
+        self.visit(node)
+
     def generic_visit(self, node):
         for field, value in vars(node).items():
             if isinstance(value, BaseAST):

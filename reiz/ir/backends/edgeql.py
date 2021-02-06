@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import singledispatchmethod
 from typing import List, Optional, Union
 
 from reiz.ir.backends import base
@@ -434,7 +435,13 @@ class For(Statement):
 
 
 class EQLOptimizer(IROptimizer):
-    ...
+    @singledispatchmethod
+    def visit(self, node):
+        self.generic_visit(node)
+
+    @visit.register(EQLCompareOperation)
+    def visit_compare_operation(self, node):
+        print(node)
 
 
 class EQLBuilder(IRBuilder, backend_name="EdgeQL"):

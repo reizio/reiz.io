@@ -1,5 +1,6 @@
 import uuid
 
+from reiz.ir.optimizer import IROptimizer
 from reiz.ir.printer import IRPrinter
 from reiz.schema import BaseSchema
 
@@ -17,6 +18,7 @@ class UnsupportedOperation(IRError):
 class IRBuilder:
     schema = BaseSchema
     printer = IRPrinter
+    optimizer = IROptimizer
 
     def __init_subclass__(cls, backend_name):
         cls.BACKEND_NAME = backend_name
@@ -43,7 +45,11 @@ class IRBuilder:
             f"{self.BACKEND_NAME} doesn't support {operation}"
         )
 
-    def construct(self, node, **view_kwargs):
+    def construct(self, node, *, optimize=False, **view_kwargs):
+        if optimize:
+            optimizer = self.optimizer()
+            optimizer.optimize(node)
+
         view_kwargs.setdefault("top_level", True)
         printer = self.printer()
         printer.view(node, **view_kwargs)
