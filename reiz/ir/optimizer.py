@@ -17,13 +17,21 @@ class IROptimizer:
         self.visit(node)
 
     def generic_visit(self, node):
+        if not isinstance(node, BaseAST):
+            return node
+
         for field, value in vars(node).items():
             if isinstance(value, BaseAST):
-                self.visit(value)
+                setattr(node, field, self.visit(value))
             elif isinstance(value, list):
+                replacement = []
                 for item in value:
-                    if isinstance(value, BaseAST):
-                        self.visit(value)
+                    replacement_item = self.visit(item)
+                    if isinstance(replacement_item, list):
+                        replacement.extend(replacement_item)
+                    elif replacement_item is not None:
+                        replacement.append(replacement_item)
+        return node
 
     def ensure(self, condition):
         if not condition:
@@ -32,11 +40,11 @@ class IROptimizer:
     @staticmethod
     def guarded(func):
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(self, node, *args, **kwargs):
             try:
-                res = func(*args, **kwargs)
+                res = func(self, node, *args, **kwargs)
             except QuitOptimization:
-                return None
+                return node
             else:
                 return res
 

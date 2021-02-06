@@ -440,12 +440,12 @@ class For(Statement):
 class EQLOptimizer(IROptimizer):
     @singledispatchmethod
     def visit(self, node):
-        self.generic_visit(node)
+        return self.generic_visit(node)
 
     @visit.register(CompareOperation)
     def visit_compare_operation(self, node):
-        self.optimize_type_or(node)
-        self.generic_visit(node)
+        node = self.optimize_type_or(node)
+        return self.generic_visit(node)
 
     @IROptimizer.guarded
     def optimize_type_or(self, node):
@@ -466,11 +466,10 @@ class EQLOptimizer(IROptimizer):
         self.ensure(isinstance(node.right.right, NamespaceAttribute))
         self.ensure(node.left.left == node.right.left)
 
-        node.right = CompareOperation(
+        rhs = CompareOperation(
             node.left.right, node.right.right, Comparator.BITWISE_OR
         )
-        node.left = node.left.left
-        node.operator = Comparator.IDENTICAL
+        return CompareOperation(node.left.left, rhs, Comparator.IDENTICAL)
 
 
 class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
