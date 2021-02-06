@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Union
 
+from reiz.ir.backends import base
 from reiz.ir.builder import IRBuilder
+from reiz.ir.optimizer import IROptimizer
 from reiz.ir.printer import IRPrinter
 from reiz.schema import EQLSchema
 from reiz.utilities import ReizEnum
@@ -50,19 +52,19 @@ class EQLPrinter(IRPrinter):
                         self.view(delimiter)
 
 
-class EQL:
+class EQL(base.IRObject):
     ...
 
 
-class Unit(EQL):
+class Unit(EQL, base.Unit):
     ...
 
 
-class Statement(EQL):
+class Statement(EQL, base.Statement):
     ...
 
 
-class Expression(EQL):
+class Expression(EQL, base.Expression):
     ...
 
 
@@ -431,9 +433,14 @@ class For(Statement):
         state.view(self.body)
 
 
+class EQLOptimizer(IROptimizer):
+    ...
+
+
 class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
     schema = EQLSchema
     printer = EQLPrinter
+    optimizer = EQLOptimizer
 
     def wrap(self, key, with_prefix=True):
         if isinstance(key, str):
