@@ -118,7 +118,7 @@ def aggregate_array(state):
     # If we are in a nested list search (e.g: Call(args=[Call(args=[Name()])]))
     # we can't directly use `ORDER BY @index` since the EdgeDB can't quite infer
     # which @index are we talking about.
-    if state.is_flag_set("in for loop"):
+    if len(state.parents) >= 1:
         path = IR.attribute(
             IR.typed(IR.name(_COMPILER_WORKAROUND_FOR_TARGET), state.match),
             state.pointer,

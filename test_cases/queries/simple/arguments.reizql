@@ -1,0 +1,10 @@
+FunctionDef(
+    args = arguments(
+        posonlyargs = [
+            arg('bar')
+        ],
+        args = [
+            arg('baz')
+        ]
+    )
+)
