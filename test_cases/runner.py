@@ -269,6 +269,7 @@ def main(argv=None):
     parser.add_argument("--change-db-schema", action="store_true")
     parser.add_argument("--run-benchmarks", action="store_true")
     parser.add_argument("--start-edgedb-server", action="store_true")
+    parser.add_argument("--do-not-fail", action="store_true")
     parser.add_argument("--allow-fail", nargs="+", default=frozenset())
     options = parser.parse_args(argv)
 
@@ -284,7 +285,7 @@ def main(argv=None):
     if EDB_PROCESS is not None:
         EDB_PROCESS.terminate()
 
-    return fail
+    return 0 if options.do_not_fail else fail
 
 
 if __name__ == "__main__":
