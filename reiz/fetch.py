@@ -31,8 +31,7 @@ POSITION_SELECTION = [
 STATS_QUERY = IR.construct(
     IR.select(
         IR.merge(
-            IR.call("count", [IR.name(IR.wrap(name))])
-            for name in STATISTICS_NODES
+            IR.call("count", [IR.wrap(name)]) for name in STATISTICS_NODES
         )
     )
 )
