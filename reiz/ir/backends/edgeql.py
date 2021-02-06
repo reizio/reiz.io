@@ -444,18 +444,33 @@ class EQLOptimizer(IROptimizer):
 
     @visit.register(CompareOperation)
     def visit_compare_operation(self, node):
-        if node.operator is Comparator.OR:
-            self.optimize_type_or(node)
-
+        self.optimize_type_or(node)
         self.generic_visit(node)
 
     @IROptimizer.guarded
     def optimize_type_or(self, node):
+        # Optimize away type-level ORs
+        # ReizQL        => Return(Name() | Tuple())
+        # Unoptimized   => SELECT ast::Return
+        #                  FILTER .value IS ast::Name OR .value is ast::Tuple
+        #
+        # Optimized     => SELECT ast::Return
+        #                  FILTER .value IS (ast::Name | ast::Tupel)
+
+        self.ensure(node.operator is Comparator.OR)
         self.ensure(isinstance(node.left, CompareOperation))
         self.ensure(isinstance(node.right, CompareOperation))
         self.ensure(node.left.operator is Comparator.IDENTICAL)
         self.ensure(node.right.operator is Comparator.IDENTICAL)
+        self.ensure(isinstance(node.left.right, NamespaceAttribute))
+        self.ensure(isinstance(node.right.right, NamespaceAttribute))
         self.ensure(node.left.left == node.right.left)
+
+        node.right = CompareOperation(
+            node.left.right, node.right.right, Comparator.BITWISE_OR
+        )
+        node.left = node.left.left
+        node.operator = Comparator.IDENTICAL
 
 
 class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
