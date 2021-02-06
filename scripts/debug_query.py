@@ -16,7 +16,9 @@ def main():
         help="the file to parse; defaults to stdin",
     )
     parser.add_argument(
-        "--optimize", action="store_true", help="optimize the generated IR"
+        "--do-not-optimize",
+        action="store_false",
+        help="do not generated optimized IR",
     )
     options = parser.parse_args()
     with options.source:
@@ -24,7 +26,9 @@ def main():
         pprint(query)
 
         ir = compile_to_ir(query)
-        print(IR.construct(ir, optimize=options.optimize, top_level=True))
+        print(
+            IR.construct(ir, optimize=options.do_not_optimize, top_level=True)
+        )
 
 
 if __name__ == "__main__":

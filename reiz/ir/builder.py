@@ -45,7 +45,7 @@ class IRBuilder:
             f"{self.BACKEND_NAME} doesn't support {operation}"
         )
 
-    def construct(self, node, *, optimize=False, **view_kwargs):
+    def construct(self, node, *, optimize=True, **view_kwargs):
         if optimize:
             optimizer = self.optimizer()
             optimizer.optimize(node)
