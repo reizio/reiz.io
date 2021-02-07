@@ -442,12 +442,32 @@ class EQLOptimizer(IROptimizer):
     def visit(self, node):
         return self.generic_visit(node)
 
+    @visit.register(UnaryOperation)
+    def visit_unary_operation(self, node):
+        node = self.optimize_double_negatives(node)
+        return self.generic_visit(node)
+
     @visit.register(CompareOperation)
     def visit_compare_operation(self, node):
         node = self.optimize_type_or(node)
         return self.generic_visit(node)
 
-    @IROptimizer.guarded
+    @IROptimizer.optimization
+    def optimize_double_negatives(self, node):
+        # Optimize away double negatives
+        # ReizQL        => arg(annotation = not None)
+        # Unoptimized   => SELECT ast::arg
+        #                  FILTER NOT NOT EXISTS .annotation
+        #
+        # Optimized     => SELECT ast::arg
+        #                  FILTER EXISTS .annotation
+
+        self.ensure(isinstance(node.operand, UnaryOperation))
+        self.ensure(node.operator is UnaryOperator.NOT)
+        self.ensure(node.operand.operator is UnaryOperator.NOT)
+        return node.operand.operand
+
+    @IROptimizer.optimization
     def optimize_type_or(self, node):
         # Optimize away type-level ORs
         # ReizQL        => Return(Name() | Tuple())

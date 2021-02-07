@@ -38,14 +38,14 @@ class IROptimizer:
             raise QuitOptimization
 
     @staticmethod
-    def guarded(func):
+    def optimization(func):
         @functools.wraps(func)
         def wrapper(self, node, *args, **kwargs):
             try:
-                res = func(self, node, *args, **kwargs)
+                replacement = func(self, node, *args, **kwargs)
             except QuitOptimization:
                 return node
             else:
-                return res
+                return self.visit(replacement)
 
         return wrapper
