@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from functools import singledispatchmethod
+from dataclasses import dataclass, field, replace
 from typing import List, Optional, Union
 
 from reiz.ir.backends import base
@@ -62,11 +61,11 @@ class Unit(EQL, base.Unit):
 
 
 class Statement(EQL, base.Statement):
-    ...
+    replace = replace
 
 
 class Expression(EQL, base.Expression):
-    ...
+    replace = replace
 
 
 class Operator(Unit, ReizEnum):
@@ -112,6 +111,22 @@ class Comparator(str, Operator):
     BITWISE_OR = "|"
 
 
+_COUNTER_OPERATORS = {
+    Comparator.GT: Comparator.LTE,
+    Comparator.LT: Comparator.GTE,
+    Comparator.GTE: Comparator.LT,
+    Comparator.LTE: Comparator.GT,
+    Comparator.EQUALS: Comparator.NOT_EQUALS,
+    Comparator.CONTAINS: Comparator.NOT_CONTAINS,
+    Comparator.IDENTICAL: Comparator.NOT_IDENTICAL,
+    Comparator.LIKE: Comparator.NOT_LIKE,
+    Comparator.ILIKE: Comparator.NOT_ILIKE,
+}
+_COUNTER_OPERATORS.update(
+    [(counter, original) for original, counter in _COUNTER_OPERATORS.items()]
+)
+
+
 @dataclass
 class UnaryOperation(Expression):
     operand: EQL
@@ -154,6 +169,12 @@ class CompareOperation(ComplexExpression):
                 yield from side.unpack()
             else:
                 yield side
+
+    def is_simple(self):
+        return all(
+            not isinstance(side, CompareOperation)
+            for side in (self.left, self.right)
+        )
 
     def _construct_complex(self, state):
         self.construct_unpacked(state, Comparator.AND + " ")
@@ -438,16 +459,36 @@ class For(Statement):
 
 
 class EQLOptimizer(IROptimizer):
-    @singledispatchmethod
-    def visit(self, node):
-        return self.generic_visit(node)
+    @IROptimizer.optimization
+    def optimize_negative_operators(self, node):
+        # Optimize operators
+        # ReizQL        => Constant(not 'x')
+        # Unoptimized   => SELECT ast::Constant
+        #                  FILTER NOT .value = "'x'"
+        #
+        # Optimized     => SELECT ast::Constant
+        #                  FILTER .value != "'x'"
+        self.ensure(isinstance(node.operand, CompareOperation))
+        self.ensure(node.operand.is_simple())
+        self.ensure(operator := _COUNTER_OPERATORS.get(node.operand.operator))
+        return node.operand.replace(operator=operator)
 
-    @visit.register(CompareOperation)
-    def visit_compare_operation(self, node):
-        node = self.optimize_type_or(node)
-        return self.generic_visit(node)
+    @IROptimizer.optimization
+    def optimize_double_negatives(self, node):
+        # Optimize away double negatives
+        # ReizQL        => arg(annotation = not None)
+        # Unoptimized   => SELECT ast::arg
+        #                  FILTER NOT NOT EXISTS .annotation
+        #
+        # Optimized     => SELECT ast::arg
+        #                  FILTER EXISTS .annotation
 
-    @IROptimizer.guarded
+        self.ensure(isinstance(node.operand, UnaryOperation))
+        self.ensure(node.operator is UnaryOperator.NOT)
+        self.ensure(node.operand.operator is UnaryOperator.NOT)
+        return node.operand.operand
+
+    @IROptimizer.optimization
     def optimize_type_or(self, node):
         # Optimize away type-level ORs
         # ReizQL        => Return(Name() | Tuple())
@@ -470,6 +511,14 @@ class EQLOptimizer(IROptimizer):
             node.left.right, node.right.right, Comparator.BITWISE_OR
         )
         return CompareOperation(node.left.left, rhs, Comparator.IDENTICAL)
+
+    OPTIMIZATIONS = {
+        UnaryOperation: [
+            optimize_negative_operators,
+            optimize_double_negatives,
+        ],
+        CompareOperation: [optimize_type_or],
+    }
 
 
 class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
