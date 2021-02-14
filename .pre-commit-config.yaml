@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/hakancelik96/unimport
-    rev: master
+    rev: 0.7.3
     hooks:
       - id: unimport
         args:
@@ -13,11 +13,11 @@ repos:
     hooks:
     -   id: black
 -   repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.5.0
+    rev: v5.7.0
     hooks:
     -   id: isort
         additional_dependencies: [toml]
 -   repo: https://github.com/asottile/setup-cfg-fmt
-    rev: v1.11.0
+    rev: v1.16.0
     hooks:
     -   id: setup-cfg-fmt
