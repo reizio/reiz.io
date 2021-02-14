@@ -1,4 +1,5 @@
 for x in y:  # reiz: tp
+    pass
     a = 1
 
 for y in z:  # reiz: tp
@@ -7,9 +8,10 @@ for y in z:  # reiz: tp
 
 for x in y:  # reiz: tp
     continue
+    d = 3
 
 for x in y:  # reiz: tp
-    continue
+    pass
     try:
         ...
     except:
