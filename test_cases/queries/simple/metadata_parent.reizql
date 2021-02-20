@@ -1,0 +1,6 @@
+Call(
+    Name('something'),
+    __metadata__ = META(
+        parent=If(test=...)
+    )
+)
