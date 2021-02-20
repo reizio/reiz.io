@@ -14,6 +14,16 @@ def iter_properties(node):
     yield from iter_attributes(node)
 
 
+def iter_children(node):
+    for field, value in ast.iter_fields(node):
+        if isinstance(value, ast.AST):
+            yield field, value
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, ast.AST):
+                    yield field, item
+
+
 def alter_ast(node, alter_type, value):
     if alter_type not in ("_fields", "_attributes"):
         raise ValueError(
@@ -92,14 +102,16 @@ class QLAst(ast.NodeTransformer):
 
     def add_parents(self, tree):
         tree._parent = None
+        tree._parent_field = None
         for parent in ast.walk(tree):
-            for child in ast.iter_child_nodes(parent):
+            for field, child in iter_children(parent):
                 child._parent = parent
+                child._parent_field = field
 
     def get_parents(self, node):
         parent = node
         while parent := parent._parent:
-            yield parent
+            yield parent._parent_field, parent
 
     def annotate(self, tree):
         self.add_parents(tree)
@@ -124,7 +136,10 @@ class QLAst(ast.NodeTransformer):
         calculate_node_tag(node)
         node.tag = hash(node.raw_tag)
         node.parent_types = list(
-            {parent.type_id for parent in self.get_parents(node)}
+            {
+                (parent.type_id, field)
+                for field, parent in self.get_parents(node)
+            }
         )
         return node
 

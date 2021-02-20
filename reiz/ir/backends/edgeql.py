@@ -602,6 +602,7 @@ class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
     name = Name
     call = Call
     cast = Cast
+    tuple = Tuple
     union = Union
     assign = Assign
     exists = Exists
