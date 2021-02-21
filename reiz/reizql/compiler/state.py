@@ -117,16 +117,12 @@ class CompilerState:
         if not condition:
             raise ReizQLSyntaxError(f"compiler check failed for: {node!r}")
 
-    def as_unique_ref(self, prefix):
-        return
+    def is_special(self, name):
+        return name.startswith("__") and name.endswith("__")
 
     @property
     def is_root(self):
         return self.depth == 0
-
-    @property
-    def can_raw_name_access(self):
-        return
 
     @property
     def pointer(self):
@@ -134,4 +130,5 @@ class CompilerState:
 
     @property
     def field_info(self):
+        assert not self.is_special(self.match)
         return FIELD_DB[self.match][self.pointer_stack[0]]
