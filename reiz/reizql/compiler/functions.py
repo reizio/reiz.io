@@ -113,6 +113,8 @@ def metadata_parent(parent_node, state):
 
 @Signature.register("META", ["parent"], {"parent": None})
 def convert_meta(node, state, arguments):
+    state.ensure(node, state.pointer == "__metadata__")
+
     filters = None
     if arguments.parent:
         filters = IR.combine_filters(

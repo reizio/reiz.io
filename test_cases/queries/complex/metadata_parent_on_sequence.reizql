@@ -1,0 +1,6 @@
+Call(
+    Name('func'),
+    __metadata__ = META(
+        parent = If(body=...)
+    )
+)
