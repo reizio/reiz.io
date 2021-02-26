@@ -18,6 +18,7 @@ class CompilerState:
 
     pointer_stack: List[str] = field(default_factory=list)
     scope: Scope = field(default_factory=Scope)
+    filters: List[IR.expression] = field(default_factory=list)
     variables: Dict[IR.name, IR.expression] = field(default_factory=dict)
     properties: Dict[str, Any] = field(default_factory=dict)
     parents: List[CompilerState] = field(default_factory=list, repr=False)
@@ -31,6 +32,7 @@ class CompilerState:
             depth=parent.depth + 1,
             scope=parent.scope,
             parents=parent.parents + [parent],
+            filters=parent.filters,
             variables=parent.variables,
             properties=parent.properties,
         )
@@ -84,16 +86,22 @@ class CompilerState:
         with self.temp_pointer(key):
             return self.codegen(value)
 
-    def compute_path(self):
+    def compute_path(self, allow_missing=False):
         parent, *parents = self.get_ordered_parents()
 
-        base = parent.pointer
+        def get_pointer(state, allow_missing):
+            pointer = state.pointer
+            if allow_missing:
+                pointer = IR.optional(pointer)
+            return pointer
+
+        base = get_pointer(parent, allow_missing)
         if not parent.is_flag_set("in for loop"):
             base = IR.attribute(None, base)
 
         for parent in parents:
             base = IR.typed(base, parent.match)
-            base = IR.attribute(base, parent.pointer)
+            base = IR.attribute(base, get_pointer(parent, allow_missing))
 
         return base
 
