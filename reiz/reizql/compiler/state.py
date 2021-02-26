@@ -85,17 +85,16 @@ class CompilerState:
             return self.codegen(value)
 
     def compute_path(self):
-        base = None
-        for parent in self.get_ordered_parents():
-            if base is None:
-                if self.is_flag_set("in for loop"):
-                    base = parent.pointer
-                else:
-                    base = IR.attribute(None, parent.pointer)
-            else:
-                base = IR.attribute(
-                    IR.typed(base, parent.match), parent.pointer
-                )
+        parent, *parents = self.get_ordered_parents()
+
+        base = parent.pointer
+        if not parent.is_flag_set("in for loop"):
+            base = IR.attribute(None, base)
+
+        for parent in parents:
+            base = IR.typed(base, parent.match)
+            base = IR.attribute(base, parent.pointer)
+
         return base
 
     def get_ordered_parents(self):
