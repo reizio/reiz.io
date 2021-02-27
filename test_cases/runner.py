@@ -146,8 +146,11 @@ class TestItem:
     expected_filename: str
     expected_line_numbers: Set[int]
 
+    skip: bool = False
+
     @classmethod
     def from_test_path(cls, path):
+        skip = False
         reiz_ql = path.read_text()
         relative_path = path.relative_to(QUERIES_PATH)
         expected_path = (DATASET_PATH / relative_path).with_suffix(".py")
@@ -155,11 +158,14 @@ class TestItem:
         expected_line_numbers = set()
         with open(expected_path) as stream:
             for token in tokenize.generate_tokens(stream.readline):
-                if (
-                    token.exact_type == tokenize.COMMENT
-                    and "reiz: tp" in token.string
-                ):
-                    expected_line_numbers.add(token.start[0])
+                if token.exact_type == tokenize.COMMENT:
+                    prefix, _, tag = token.string.partition(":")
+                    tag = tag.strip()
+
+                    if tag == "tp":
+                        expected_line_numbers.add(token.start[0])
+                    elif tag == "skip":
+                        skip = True
 
         name = str(relative_path.with_suffix(str()))
         return cls(
@@ -167,6 +173,7 @@ class TestItem:
             reiz_ql,
             str(expected_path.relative_to(TESTING_PATH)),
             expected_line_numbers,
+            skip,
         )
 
     def expect(self, message, left, right, truth):
@@ -239,6 +246,10 @@ def run_tests(allow_fail):
     fail = False
     with get_new_connection() as connection:
         for test_case in collect_tests():
+            if test_case.skip:
+                logger.info("%r skipped", test_case.name)
+                continue
+
             try:
                 test_case.execute(connection)
             except ExpectationFailed:

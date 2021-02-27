@@ -1,3 +1,5 @@
+# reiz: skip
+
 if something():  # reiz: tp
     ...
 
