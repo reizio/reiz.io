@@ -237,19 +237,20 @@ class TestItem:
         return runs
 
 
-def collect_tests(queries=QUERIES_PATH):
+def collect_tests(queries=QUERIES_PATH, *, log_skip=True):
     for query in queries.glob("**/*.reizql"):
-        yield TestItem.from_test_path(query)
+        test_case = TestItem.from_test_path(query)
+        if test_case.skip:
+            if log_skip:
+                logger.info("%r skipped", test_case.name)
+            continue
+        yield test_case
 
 
 def run_tests(allow_fail):
     fail = False
     with get_new_connection() as connection:
         for test_case in collect_tests():
-            if test_case.skip:
-                logger.info("%r skipped", test_case.name)
-                continue
-
             try:
                 test_case.execute(connection)
             except ExpectationFailed:
@@ -269,7 +270,7 @@ def run_benchmarks(times=3):
     with get_new_connection() as connection:
         benchmarks = {
             test_case.name: test_case.run_benchmarks(connection, times=times)
-            for test_case in collect_tests()
+            for test_case in collect_tests(log_skip=False)
         }
         pprint(benchmarks)
 
