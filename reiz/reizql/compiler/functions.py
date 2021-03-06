@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List
 
 from reiz.ir import IR
 from reiz.reizql.parser import grammar
+from reiz.serialization.transformers import ast
 
 if TYPE_CHECKING:
     BuiltinFunctionType = Callable[
@@ -91,4 +92,32 @@ def convert_length(node, state, arguments):
         )
 
     assert filters is not None
+    return filters
+
+
+def metadata_parent(parent_node, state):
+    state.ensure(parent_node, len(parent_node.filters) == 1)
+
+    parent_field, filter_value = parent_node.filters.popitem()
+    state.ensure(parent_node, filter_value is grammar.Ignore)
+
+    with state.temp_pointer("parent_types"):
+        return IR.filter(
+            IR.tuple(
+                [parent_node.bound_node.type_id, IR.literal(parent_field)]
+            ),
+            state.compute_path(),
+            "IN",
+        )
+
+
+@Signature.register("META", ["parent"], {"parent": None})
+def convert_meta(node, state, arguments):
+    state.ensure(node, state.pointer == "__metadata__")
+
+    filters = None
+    if arguments.parent:
+        filters = IR.combine_filters(
+            filters, metadata_parent(arguments.parent, state)
+        )
     return filters

@@ -34,6 +34,8 @@ def compile_matcher(node, state):
 
     if state.is_root:
         state.scope.exit()
+        if state.filters:
+            filters = IR.l_combine_multi_filters(state.filters, filters)
         if state.variables:
             namespace = IR.namespace(state.variables)
             filters = IR.add_namespace(namespace, IR.select(filters))
@@ -125,7 +127,7 @@ def aggregate_array(state):
         )
         body = IR.loop(
             IR.name(_COMPILER_WORKAROUND_FOR_TARGET),
-            state.parents[-1].compute_path(),
+            state.parents[-1].compute_path(allow_missing=True),
             IR.select(path, order=IR.property("index")),
         )
     else:
@@ -137,23 +139,29 @@ def aggregate_array(state):
 @codegen.register(grammar.List)
 def compile_sequence(node, state):
     total_length = len(node.items)
-    length_verifier = IR.filter(
-        IR.call("count", [state.compute_path()]), total_length, "="
-    )
+    verify_call = IR.call("count", [state.compute_path()])
 
-    if total_length == 0 or all(
-        item in (grammar.Ignore, grammar.Expand) for item in node.items
-    ):
-        return length_verifier
+    length_verifier = IR.filter(verify_call, total_length, "=")
 
     if total := node.items.count(grammar.Expand):
         state.ensure(node, total == 1)
-        length_verifier = IR.filter(
-            IR.call("count", [state.compute_path()]), total_length - 1, ">="
-        )
+        length_verifier = IR.filter(verify_call, total_length - 1, ">=")
+
+    state.filters.append(length_verifier)
+    if total_length == 0 or all(
+        item in (grammar.Ignore, grammar.Expand) for item in node.items
+    ):
+        return None
 
     array_ref = IR.new_reference("sequence")
     state.variables[array_ref] = aggregate_array(state)
+
+    # For length verifier, instead of re-accessing the path
+    # we'll use the already aggregated array. So switch the
+    # verifier function from 'count' to 'len' (one is for sets
+    # and the other one is for arrays.)
+    verify_call.func = "len"
+    verify_call.args = [array_ref]
 
     expansion_seen = False
     with state.temp_flag("in for loop"), state.temp_property(
@@ -174,10 +182,7 @@ def compile_sequence(node, state):
                 if item_filters := state.codegen(matcher):
                     filters = IR.combine_filters(filters, item_filters)
 
-        if filters:
-            return IR.combine_filters(length_verifier, filters)
-        else:
-            return length_verifier
+        return filters
 
 
 @codegen.register(type(grammar.Cease))

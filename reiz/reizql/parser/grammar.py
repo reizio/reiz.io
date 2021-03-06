@@ -1,3 +1,4 @@
+import ast
 import typing
 from dataclasses import dataclass, field
 from enum import auto
@@ -44,6 +45,8 @@ class LogicOperator(Unit, ReizEnum):
 @dataclass
 class Match(Expression):
     name: str
+    bound_node: ast.AST = field(repr=False)
+
     filters: typing.Dict[str, Expression] = field(default_factory=dict)
     positional: bool = False
 

@@ -146,6 +146,11 @@ def serialize_sequence(sequence, context):
         return IR.add_namespace(scope, loop)
 
 
+@serialize.register(tuple)
+def serialize_tuple(sequence, context):
+    return IR.tuple([serialize(value, context) for value in sequence])
+
+
 @serialize.register(str)
 @serialize.register(int)
 def serialize_string(value, context):

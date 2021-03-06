@@ -18,6 +18,8 @@ START MIGRATION TO {
             required property col_offset -> int64;
             property end_lineno -> int64;
             property end_col_offset -> int64;
+            property tag -> int64;
+            multi property parent_types -> tuple<int64, str>;
             link _module -> PyModule;
         }
         type FunctionDef extending stmt, AST {
@@ -195,6 +197,7 @@ START MIGRATION TO {
             property end_lineno -> int64;
             property end_col_offset -> int64;
             property tag -> int64;
+            multi property parent_types -> tuple<int64, str>;
             link _module -> PyModule;
         }
         type BoolOp extending expr, AST {

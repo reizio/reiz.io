@@ -14,6 +14,16 @@ def iter_properties(node):
     yield from iter_attributes(node)
 
 
+def iter_children(node):
+    for field, value in ast.iter_fields(node):
+        if isinstance(value, ast.AST):
+            yield field, value
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, ast.AST):
+                    yield field, item
+
+
 def alter_ast(node, alter_type, value):
     if alter_type not in ("_fields", "_attributes"):
         raise ValueError(
@@ -35,7 +45,7 @@ def annotate_ast_types(node_type, base=None, last_id=0):
     return last_id + 1
 
 
-def calculate_expr_tag(node):
+def calculate_node_tag(node):
     if hasattr(node, "tag"):
         return node.raw_tag
     elif node is None:
@@ -47,9 +57,9 @@ def calculate_expr_tag(node):
             continue
 
         if isinstance(value, ast.AST) or value is None:
-            tag.append(calculate_expr_tag(value))
+            tag.append(calculate_node_tag(value))
         elif isinstance(value, list):
-            tag.append(tuple(calculate_expr_tag(item) for item in value))
+            tag.append(tuple(calculate_node_tag(item) for item in value))
         else:
             tag.append(value)
 
@@ -83,13 +93,28 @@ for sum_type in Schema.module_annotated_types:
     alter_ast(sum_type, "_attributes", "_module")
 
 
-@object.__new__
 class QLAst(ast.NodeTransformer):
     """
     Takes the raw AST generated from 3.8 Python
     parser, and post-processes it according to
     fit it into the EdgeQL format
     """
+
+    def add_parents(self, tree):
+        tree._parent = None
+        tree._parent_field = None
+        for parent in ast.walk(tree):
+            for field, child in iter_children(parent):
+                child._parent = parent
+                child._parent_field = field
+
+    def get_parents(self, node):
+        parent = node
+        while parent := parent._parent:
+            yield parent._parent_field, parent
+
+    def annotate(self, tree):
+        self.add_parents(tree)
 
     def visit(self, node):
         result = super().visit(node)
@@ -107,10 +132,19 @@ class QLAst(ast.NodeTransformer):
             self.generic_visit(node)
         return result
 
-    def visit_expr(self, node):
-        calculate_expr_tag(node)
+    def visit_annotated_base(self, node):
+        calculate_node_tag(node)
         node.tag = hash(node.raw_tag)
+        node.parent_types = list(
+            {
+                (parent.type_id, field)
+                for field, parent in self.get_parents(node)
+            }
+        )
         return node
+
+    visit_expr = visit_annotated_base
+    visit_stmt = visit_annotated_base
 
     def visit_slice(self, node):
         node.sentinel = Sentinel()
@@ -145,5 +179,10 @@ def infer_base(node):
         return node_type.__base__
 
 
-prepare_ast = QLAst.visit
+def prepare_ast(tree):
+    visitor = QLAst()
+    visitor.annotate(tree)
+    return visitor.visit(tree)
+
+
 annotate_ast_types(ast.AST)

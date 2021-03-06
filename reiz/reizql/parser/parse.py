@@ -1,10 +1,10 @@
-import ast
 import functools
 
 from reiz.ir import IR
 from reiz.reizql.parser import ReizQLSyntaxError, grammar
+from reiz.serialization.transformers import ast
 
-BUILTIN_FUNCTIONS = ("ALL", "ANY", "LEN", "I")
+BUILTIN_FUNCTIONS = ("META", "ALL", "ANY", "LEN", "I")
 POSITION_ATTRIBUTES = frozenset(
     ("lineno", "col_offset", "end_lineno", "end_col_offset")
 )
@@ -77,7 +77,7 @@ class Parser:
                 )
                 query[arg.arg] = self.parse(arg.value)
 
-            return grammar.Match(name, query, positional=positional)
+            return grammar.Match(name, origin, query, positional=positional)
 
     @parse.register(ast.BinOp)
     def parse_binop(self, node):

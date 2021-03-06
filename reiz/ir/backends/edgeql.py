@@ -597,11 +597,17 @@ class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
         else:
             return Attribute(base, attr)
 
+    def optional(self, node):
+        if isinstance(node, self.subscript):
+            node = self.call("array_get", [node.item, node.value])
+        return node
+
     set = Set
     loop = For
     name = Name
     call = Call
     cast = Cast
+    tuple = Tuple
     union = Union
     assign = Assign
     exists = Exists

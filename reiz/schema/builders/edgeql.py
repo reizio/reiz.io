@@ -12,6 +12,7 @@ from reiz.schema.edgeql import EQLSchema as Schema
 from reiz.utilities import ReizEnum
 
 INDENT = " " * 4
+CUSTOM_TYPE_BASE = "custom_types"
 
 
 class ModelConstraint(str, ReizEnum):
@@ -62,6 +63,15 @@ class Field:
 
 
 @dataclass
+class InlinedModel:
+    base: str
+    elements: List[str]
+
+    def construct(self):
+        return f"{self.base}<{', '.join(self.elements)}>"
+
+
+@dataclass
 class Model:
     model: str
     fields: List[Field] = field(default_factory=list)
@@ -72,11 +82,12 @@ class Model:
     def enum(cls, name, members):
         # We can't directly use ident-based enums since
         # some are the members (like And, Or) are keywords
-        base = "enum"
-        base += "<"
-        base += ", ".join(repr(member) for member in members)
-        base += ">"
-        return cls(name, constraint=ModelConstraint.SCALAR, extending=[base])
+        base = InlinedModel("enum", [repr(member) for member in members])
+        return cls(
+            name,
+            constraint=ModelConstraint.SCALAR,
+            extending=[base.construct()],
+        )
 
     def construct(self):
         source = []
@@ -116,6 +127,7 @@ class EQLSchemaGenerator(pyasdl.ASDLVisitor, BaseSchemaGenerator):
         self.schema = schema
         self.enum_types = schema.setdefault("enum_types", [])
         self.module_types = schema.setdefault("module_annotated_types", [])
+        self.custom_types = {}
 
     def visit_Module(self, node):
         yield Model(self.BASE_TYPE, constraint=ModelConstraint.ABSTRACT)
@@ -130,6 +142,10 @@ class EQLSchemaGenerator(pyasdl.ASDLVisitor, BaseSchemaGenerator):
             for field in definition.fields:
                 if field.kind == "Module":
                     self.module_types.append(definition.model)
+                elif field.kind in self.custom_types:
+                    field.kind = self.custom_types[field.kind]
+                    field.is_property = True
+
                 if field.kind in self.enum_types:
                     field.is_property = True
                 if (
@@ -151,6 +167,9 @@ class EQLSchemaGenerator(pyasdl.ASDLVisitor, BaseSchemaGenerator):
         )
 
     def visit_Sum(self, node, name):
+        if name == CUSTOM_TYPE_BASE:
+            return self.process_custom_types(node)
+
         if pyasdl.is_simple_sum(node):
             self.enum_types.append(name)
             yield Model.enum(
@@ -161,6 +180,12 @@ class EQLSchemaGenerator(pyasdl.ASDLVisitor, BaseSchemaGenerator):
                 name, self.visit_all(node.attributes), ModelConstraint.ABSTRACT
             )
             yield from self.visit_all(node.types, base=name)
+
+    def process_custom_types(self, node):
+        for constructor in node.types:
+            fields = self.visit_all(constructor.fields)
+            model = InlinedModel("tuple", [field.kind for field in fields])
+            self.custom_types[constructor.name] = model.construct()
 
     def visit_Constructor(self, node, base):
         return Model(

@@ -45,7 +45,8 @@ module Python
           | Expr(expr value)
           | Pass | Break | Continue
     
-          attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, Module? _module)
+          attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset,
+                      int? tag, __parent_info* parent_types, Module? _module)
 
     expr = BoolOp(boolop op, expr* values)
          | NamedExpr(expr target, expr value)
@@ -75,7 +76,8 @@ module Python
          | Tuple(expr* elts, expr_context ctx)
          | Sentinel
 
-          attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset, int? tag, Module? _module)
+          attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset,
+                      int? tag, __parent_info* parent_types, Module? _module)
 
     slice = Slice(expr? lower, expr? upper, expr? step)
           | ExtSlice(slice* dims)
@@ -112,4 +114,6 @@ module Python
              | LShift | RShift | BitOr | BitXor | BitAnd | FloorDiv
 
     project = (string name, string git_source, string git_revision)
+
+    custom_types = __parent_info(int type_id, string field)
 }
