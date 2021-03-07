@@ -1,5 +1,3 @@
-# reiz: skip
-
 if foo:
     func()  # reiz: tp
 
