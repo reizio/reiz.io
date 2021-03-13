@@ -1,0 +1,22 @@
+With(
+    items=[
+        withitem(
+            context_expr=Call(func=Name(id="open"), args=[...], keywords=[]),
+            optional_vars=~stream,
+        )
+    ],
+    body=[
+        Assign(
+            targets=[Name(id="tree")],
+            value=Call(
+                func=Attribute(value=Name(id="ast"), attr="parse"),
+                args=[
+                    Call(
+                        func=Attribute(value=~stream, attr="read"), args=[], keywords=[]
+                    )
+                ],
+                keywords=[],
+            ),
+        )
+    ],
+)
