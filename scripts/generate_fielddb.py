@@ -11,17 +11,14 @@ class FieldDBGenerator(pyasdl.ASDLVisitor):
     def visit_Module(self, node):
         layout = defaultdict(dict)
         for definition in node.body:
-            self.visit(definition.value, layout)
+            self.visit(definition.value, definition.name, layout)
         return layout
 
-    def visit_Type(self, node, layout):
-        self.visit(node.value, layout)
-
-    def visit_Product(self, node, layout):
+    def visit_Product(self, node, name, layout):
         for field, value in self.visit_all(node.fields + node.attributes):
-            layout[field] = value
+            layout[name][field] = value
 
-    def visit_Sum(self, node, layout):
+    def visit_Sum(self, node, name, layout):
         for attr, value in self.visit_all(node.attributes):
             layout[attr] = value
         self.visit_all(node.types, layout)
@@ -48,7 +45,7 @@ def main():
 
     visitor = FieldDBGenerator()
     layout = visitor.visit(tree)
-    print(json.dumps(layout))
+    print(json.dumps(layout, indent=4))
 
 
 if __name__ == "__main__":
