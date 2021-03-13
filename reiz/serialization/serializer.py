@@ -118,7 +118,7 @@ def serialize_ast(node, context):
         )
 
 
-_BASIC_SET_TYPES = Schema.enum_types + (int, str)
+_BASIC_SET_TYPES = Schema.enum_types + (int, str, tuple)
 
 
 @serialize.register(list)

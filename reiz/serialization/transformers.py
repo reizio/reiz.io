@@ -85,12 +85,16 @@ class project(ast.AST):
 
 ast.Sentinel = Sentinel
 ast.project = project
+
 alter_ast(ast.Module, "_fields", "filename")
 alter_ast(ast.Module, "_fields", "project")
+
 alter_ast(ast.slice, "_attributes", "sentinel")
-alter_ast(ast.expr, "_attributes", "tag")
+
 for sum_type in Schema.module_annotated_types:
     alter_ast(sum_type, "_attributes", "_module")
+    alter_ast(sum_type, "_attributes", "_tag")
+    alter_ast(sum_type, "_attributes", "_parent_types")
 
 
 class QLAst(ast.NodeTransformer):
@@ -109,9 +113,9 @@ class QLAst(ast.NodeTransformer):
                 child._parent_field = field
 
     def get_parents(self, node):
-        parent = node
-        while parent := parent._parent:
-            yield parent._parent_field, parent
+        while parent := node._parent:
+            yield node._parent_field, parent
+            node = parent
 
     def annotate(self, tree):
         self.add_parents(tree)
@@ -134,17 +138,19 @@ class QLAst(ast.NodeTransformer):
 
     def visit_annotated_base(self, node):
         calculate_node_tag(node)
-        node.tag = hash(node.raw_tag)
-        node.parent_types = list(
+        node._tag = hash(node.raw_tag)
+        node._parent_types = list(
             {
                 (parent.type_id, field)
                 for field, parent in self.get_parents(node)
+                if field is not None
             }
         )
         return node
 
     visit_expr = visit_annotated_base
     visit_stmt = visit_annotated_base
+    visit_arg = visit_annotated_base
 
     def visit_slice(self, node):
         node.sentinel = Sentinel()

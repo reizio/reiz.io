@@ -107,8 +107,8 @@ def compile_reference(node, state):
         right = pointer.compute_path()
 
         if issubclass(expected_type, ast.expr):
-            left = IR.attribute(left, "tag")
-            right = IR.attribute(right, "tag")
+            left = IR.attribute(left, "_tag")
+            right = IR.attribute(right, "_tag")
 
         return IR.filter(left, right, "=")
 
