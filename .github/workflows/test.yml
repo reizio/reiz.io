@@ -35,6 +35,7 @@ jobs:
       uses: edgedb/setup-edgedb@v1
       with:
         server-version: nightly
+        cli-version: nightly
 
     - name: Test
       env:

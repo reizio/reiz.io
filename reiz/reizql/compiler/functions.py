@@ -101,7 +101,7 @@ def metadata_parent(parent_node, state):
     parent_field, filter_value = parent_node.filters.popitem()
     state.ensure(parent_node, filter_value is grammar.Ignore)
 
-    with state.temp_pointer("parent_types"):
+    with state.temp_pointer("_parent_types"):
         return IR.filter(
             IR.tuple(
                 [parent_node.bound_node.type_id, IR.literal(parent_field)]
