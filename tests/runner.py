@@ -26,7 +26,7 @@ sys.path.insert(0, REPO_PATH)
 
 from scripts.reset_db import drop_and_load_db
 
-TESTING_PATH = REPO_PATH / "test_cases"
+TESTING_PATH = REPO_PATH / "tests"
 DATASET_PATH = TESTING_PATH / "dataset"
 QUERIES_PATH = TESTING_PATH / "queries"
 
