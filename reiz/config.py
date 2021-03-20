@@ -81,7 +81,7 @@ class validator:
 @validator.segment("database", requirements=["dsn", "database"])
 def process_segment(segment):
     validator.set_if_not_already(segment, "cluster")
-    validator.set_if_not_already(segment, "options", SimpleNamespace())
+    validator.cast(segment, "options", vars)
 
 
 @validator.segment("redis")
