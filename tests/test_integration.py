@@ -35,8 +35,14 @@ def docker_compose_file(pytestconfig):
 @pytest.fixture(scope="session")
 def reiz_service():
     process = subprocess.Popen(["docker-compose", "up"])
+    total_wait = 0
     while not health_check():
+        if total_wait >= 60 * 30:
+            raise ValueError(
+                "tests: docker service is not responding (awaited 30 mins)"
+            )
         time.sleep(30)
+        total_wait += 30
     yield
     process.terminate()
 
