@@ -34,8 +34,8 @@ def compile_matcher(node, state):
 
     if state.is_root:
         state.scope.exit()
-        if state.filters:
-            filters = IR.l_combine_multi_filters(state.filters, filters)
+        if state_filters := IR.unpack_filters(state.filters):
+            filters = IR.combine_filters(filters, state_filters)
         if state.variables:
             namespace = IR.namespace(state.variables)
             filters = IR.add_namespace(namespace, IR.select(filters))

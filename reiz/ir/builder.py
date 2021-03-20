@@ -34,15 +34,11 @@ class IRBuilder:
         else:
             return self.filter(left, right, operator)
 
-    def combine_multi_filters(self, left, right_filters, operator="AND"):
-        for right_filter in right_filters:
-            left = self.combine_filters(left, right_filter, operator=operator)
+    def unpack_filters(self, filters, operator="AND"):
+        left = None
+        for right in filters:
+            left = self.combine_filters(left, right)
         return left
-
-    def l_combine_multi_filters(self, left_filters, right, operator="AND"):
-        for left_filter in reversed(left_filters):
-            right = self.combine_filters(left_filter, right, operator=operator)
-        return right
 
     def merge(self, expressions):
         union = next(expressions)
