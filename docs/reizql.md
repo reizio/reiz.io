@@ -1,12 +1,43 @@
-# ReizQL -- Language Reference
+# ReizQL Language
 
-ReizQL is a pattern matching language, for the [Python's AST](https://docs.python.org/3.8/library/ast.html#abstract-grammar). It
-allows users to describe and match nested, sequential, and ambiguous syntactic patterns in ease.
+ReizQL is a declarative query language for building AST matchers that work on
+the Reiz platform.
+
+:::{hint} Here is an example ReizQL query that searches for an if statement
+where the body consists from a single assignment statement that assigns the
+result of `requests.get(...)` call's result into a variable named `response`
 
 ```
-start                   := match_pattern
+if cache.invalidated:
+    response = requests.get('https://api.reiz.io/refresh')
+```
 
-pattern                 := negatated_pattern
+:::
+
+```py
+If(
+    body = [
+        Assign(
+            targets = [
+                Name('response')
+            ],
+            value = Call(
+                Attribute(
+                    Name('requests'),
+                    'get'
+                )
+            )
+        )
+    ]
+)
+```
+
+## Full Grammar
+
+```bnf
+start                   ::= match_pattern
+
+pattern                 ::= negate_pattern
                          | or_pattern
                          | and_pattern
                          | match_pattern
@@ -15,191 +46,448 @@ pattern                 := negatated_pattern
                          | match_string_pattern
                          | atom_pattern
 
-negate_pattern          := 'not' pattern
-or_pattern              := pattern '|' pattern
-and_pattern             := pattern '&' pattern
-match_pattern           := NAME '(' ','.argument+ ')'
-reference_pattern       := "~" NAME
-sequential_pattern      := '[' ','.(pattern | '*' IGNORE)+ ']'
-match_string_pattern    := 'f' STRING
-
-atom_pattern            := NONE
+negate_pattern          ::= "not" pattern
+or_pattern              ::= pattern "|" pattern
+and_pattern             ::= pattern "&" pattern
+match_pattern           ::= NAME "(" ",".argument+ ")"
+sequential_pattern      ::= "[" ",".(pattern | "*" IGNORE)+ "]"
+reference_pattern       ::= "~" NAME
+atom_pattern            ::= NONE
                          | STRING
                          | NUMBER
                          | IGNORE
+                         | "f" STRING
 
-argument                := pattern
-                         | NAME '=' pattern
+argument                ::= pattern
+                         | NAME "=" pattern
 
-NONE                    := 'None'
-IGNORE                  := '...'
-NAME                    := 'a'..'Z'
-NUMBER                  := INTEGER | FLOAT
-STRING                  := QUOTE (.?*) QUOTE
+NONE                    ::= "None"
+IGNORE                  ::= "..."
+NAME                    ::= "a".."Z"
+NUMBER                  ::= INTEGER | FLOAT
 ```
-
-## Patterns
-A pattern may be any of these things;
-
-### Logical Pattern
-#### NOT pattern
-A logical NOT operator that matches anything but the operand.
-```py
-Call(not Name())
-```
-would match all `Call()`s where the function is not a `Name()` node.
-
-#### OR pattern
-A logical OR operator that connects 2 different patterns together.
-```py
-Call(Name() | Attribute())
-```
-would yield all `Call()`s where the function is either `Name()` or `Attribute()`.
-
-#### AND pattern
-A logical AND operator, works just like the `OR pattern`, useful when combined
-on built-in matchers such as `LEN()` or `ANY()`.
-```py
-Call(args=[*..., Name()] & LEN(min=7))
-```
-would yield all `Call()`s where the last argument is a `Name()` node, and the
-arguments list has the minimum length of 7.
-
 
 ### Match Patterns
 
-A match pattern consists from a matcher, and a set of positional / keyword
-arguments. The matcher is either a built-in function (such as `ALL`) or an
-AST node from the [Python's Abstract Grammar](https://docs.python.org/3.8/library/ast.html#abstract-grammar).
+```bnf
+match_pattern           ::= NAME "(" ",".argument+ ")"
+```
 
-#### Built-in Matchers
-##### `ALL($0)` / `ANY($0)`
-These functions are generalized sequence filtering mechanizms to verify that
-all or any elements of the given sequence matches the inner query `$0`. The `ALL()`
-will act like a reducer which would test every element on the given sequence with
-the given pattern, and try to reduce the results with an `AND` gate. On the other
-hand, the `ANY` will do the same thing with an `OR` gate.
+Match patterns are the most fundamental part of the query expression. They
+consist from an identifier (matcher name) which corresponds to an AST node type,
+additionally they take any number of fields to be matched (values, optionally
+attached with the corresponding field names).
+
+All node types and fields are described in the
+[Abstract Grammar](https://docs.python.org/3.8/library/ast.html#abstract-grammar)
+of Python. Here are some entries from the ASDL;
+
+```
+module Python
+{
+    ...
+    stmt = FunctionDef(identifier name, arguments args,
+                       stmt* body, expr* decorator_list, expr? returns,
+                       string? type_comment)
+          | While(expr test, stmt* body, stmt* orelse)
+          | If(expr test, stmt* body, stmt* orelse)
+          | With(withitem* items, stmt* body, string? type_comment)
+
+    expr = BoolOp(boolop op, expr* values)
+         | NamedExpr(expr target, expr value)
+         | BinOp(expr left, operator op, expr right)
+         | UnaryOp(unaryop op, expr operand)
+         | Lambda(arguments args, expr body)
+         | IfExp(expr test, expr body, expr orelse)
+         | Dict(expr* keys, expr* values)
+```
+
+The left hand side is the name of the base type, `stmt` would be a matcher that
+could match all of the types in its right hand side (e.g `stmt()` would match
+`FunctionDef()` / `While()` / `If()` / `With()`). Each element on the right hand
+side are concrete matchers for that element in syntax. For example a `BinOp()`
+represents a binary operation (2 operands), like `2 + 2` or `a % b()`.
+
+Each element on the right hand side have different fields with types attached to
+them. So the `BinOp()` node has 3 fields: `left`, `op`, `right` (respectively
+they mean left hand side, operator, right hand side of an arithmetic operation).
+`left` and the `right` must be another matcher from the `expr` base type (`BoolOp`
+/ `NamedExpr`, ...). The star (`*`) at the end of type declaration implies that
+it requires a [sequential pattern](#list-patterns) where the member types
+inherit from that base type (e.g `stmt*` might be something like
+`[If(), If(), While()]`). The question mark (`?`) indicates the value is
+optional and can be `None`.
+
+If the values are not named (e.g `BinOp(Constant())`) then the name will be
+positionally given (`BinOp(Constant(), Add())` will be transformed to
+`BinOp(left=Constant(), op=Add()`).
+
+#### Example Queries
+
+- Match the `1994` literal
 
 ```py
-Call(args=ALL(Constant()))
-Call(args=ANY(Attribut()))
+Constant(1994)
 ```
 
-##### `LEN(min=$0, max=$1)`
-`LEN` is a special utility for ensuring that the length of the matched sequence
-fits the given range. It can either take them both or `min` and `max` indivudually.
-The `min` is translated to `len(sequence) >= $0`, and the max is translated to
-`len(sequence) <= $1`. The `LEN(min=x, max=y)` is a syntactic sugar for `LEN(min=x) & LEN(max=y)`.
+- Match a binary operation where both sides are literals
 
 ```py
-Call(args=LEN(min=3))
-Call(args=LEN(max=7))
-Call(args=LEN(min=5, max=8))
+BinOp(left=Constant(), right=Constant())
 ```
 
-##### `I($0)`
-`I` is an annotation for `Match String Pattern`s where you want to match a string without
-case-sensitivity.
-
-
-#### AST matchers
-The nodes in the [Python's ASDL](https://docs.python.org/3.8/library/ast.html#abstract-grammar) described in this format;
-```
-<matcher category> = <matcher name>(<field type><field qualifier> <field name>, ...)`
-                   | ...
-```
-
-
-The `<field type>` may correspond to a sequence of AST node types (such as `expr`) or only one (such as `withitem`). If it
-corresponds to a sequence, the value to be matched can be any of the types that is a member to that *sum* type. The qualifier
-that follows the `<field type>` is an optional value that represents value spec for the given type. If there is no qualifier
-the value is required, if there is;
-- `*` qualifier means the value of that field is a sequence of items that belongs to the `<field type>`
-- `?` qualifier means that value is optional, and may be `None`.
-
-When a matcher is initalized (such as `ClassDef('lol')`) the positional arguments will fill
-the fields left to right, on the other hand keyword arguments will only fill the fields
-that they correspond to.
-
-Example
+- Match an (ternary) if expression that checks `a.b`'s truthness
 
 ```py
-Name()
-Attribute(Name(), attr='foo')
-FunctionDef(name='foo', body=LEN(max=5))
+IfExp(
+    test = Attribute(
+        Name('a'),
+        attr = 'b'
+    )
+)
 ```
 
-### Reference Pattern
-Reiz allows you to give internal references to values of the executed query. These can be thought as
-(some sort of) `variables`. Basically it will try to match the references with each other.
+### Sequential Patterns
+
+```bnf
+sequential_pattern      ::= "[" ",".(pattern | "*" IGNORE)+ "]"
+```
+
+Sequential patterns represent a list of subpatterns that are combined together
+to match a list on the host AST. If we want to search a function definition
+where there are 2 statements, the first one being an if statement and the second
+one is a return of an identifier named `status` then we simply describe this
+query like this;
 
 ```py
-Module(
+FunctionDef(
     body = [
-        FunctionDef(
-            ~name,
-            body = [
-                *...,
-                Expr(
-                    Call(
-                        Name(~name)
-                    )
+        If(),
+        Return(
+            Name('status')
+        )
+    ]
+)
+```
+
+Sequential patterns are ordered, and matched one-to-one unless a
+[ignore star](#ignore-star) is seen.
+
+#### Ignore Star
+
+If any of the elements on the sequence pattern is a star (`*`) followed by an
+[ignore](#ignore-atom) then the matchers before the ignore-star are relative
+from the beginning and the matchers after the ignore-star are relative to the
+end of the sequence. This implies that there is no maximum limit of items (in
+contrast to normal sequential patterns, where the number of elements is always
+fixed to amount of patterns seen) and the minimum being the total amount of
+matchers (excluding the ignore star).
+
+Let's say we want to find a function that starts with an if statement, and then
+ends with a call to `fetch` function.
+
+```py
+FunctionDef(
+    body = [
+        If(),
+        *...,
+        Return(
+            Call(
+                Name(
+                    'fetch'
                 )
-            ]
-        ),
+            )
+        )
+    ]
+)
+```
+
+There might be any number of elements between the if statement and the return,
+and it simply won't care.
+
+:::{note} If you need a filler value (for example you want the minimum number of
+statements to be 3 instead of 2 in the case above) you can use
+[ignore atom](#ignore-atom).
+
+```py
+FunctionDef(
+    body = [
+        If(),
+        ...,
+        *...,
+        Return(
+            Call(
+                Name(
+                    'fetch'
+                )
+            )
+        )
+    ]
+)
+```
+
+:::
+
+#### Example Queries
+
+- Match all functions that have 2 statements and the last being a return
+
+```py
+FunctionDef(
+    body = [
+        ...,
+        Return()
+    ]
+)
+```
+
+- Match all try/except's where the last except handler is a bare `except: ...`
+
+```py
+Try(
+    handlers = [
+        *...,
+        ExceptHandler(
+            type = None
+        )
+    ]
+)
+```
+
+### Logical Patterns
+
+Logical patterns are different patterns connected together in the sense of some
+logical operation (either `AND` or `OR`)
+
+#### AND patterns
+
+```bnf
+and_pattern             ::= pattern "&" pattern
+```
+
+`AND` patterns chains 2 different pattern together and matches the host value if
+it can be matched by both of the connected patterns.
+
+#### OR patterns
+
+```bnf
+or_pattern              ::= pattern "|" pattern
+```
+
+`OR` patterns chains 2 different pattern together and matches the host value if
+it can be matched by either of the connected patterns.
+
+#### Example Queries
+
+- Match a return statement that either returns a list literal or a tuple literal
+
+```py
+Return(List() | Tuple())
+```
+
+- Match an if statement where the first statement is an assign and the total
+  number of statements lower/equal than 5
+
+```py
+If(
+    body = [
+        Assign(),
+        *...
+    ] & LEN(max=5)
+)
+```
+
+### NOT Patterns
+
+```bnf
+negate_pattern          ::= "not" pattern
+```
+
+For checking whether a certain pattern *does not* match on the host AST, the
+negation operator can be used.
+
+:::{hint} If a value is described as an optional (`?`) on the ASDL, then the
+existence of value can be denoted via `not None` pattern. :::
+
+#### Example Queries
+
+- Match a return statement that doesn't return a call
+
+```py
+Return(not Call())
+```
+
+- A list that doesn't start with tuples or sets
+
+```py
+List(
+    elts = [
+        (not Tuple()) & (not List()),
         *...
     ]
 )
 ```
 
+### Reference Patterns
 
-### Sequential Pattern
-
-A sequential pattern consist start with a `[` (LEFT BRACKET) and end with a `]` (RIGHT
-BRACKET). It matches a list of items, one by one with the given sequence. For example,
-if you want to match a list of length 3 where the first and the second item is a `Name()`
-and the third item is anything, you can simply right `[Name(), Name(), ...]`. Each element
-of this sequence is an individual match.
-
-
-If the length of list is uncertain, an expansion may be used `*...` (ASTERISK directly
-followed by an IGNORE token). This would mean that, after that point, there can be zero
-or more items. An example would be `[*..., Name(), ...]`, which would match all lists where
-the second from the last item is a `Name()`. Or `[Name, *..., Attribute()]` would match any
-list where the initial and last item is matched with the given patterns and ignoring the length.
-
-```py
-ClassDef(
-    body=[
-        FunctionDef(),
-        FunctionDef(),
-        Assign(targets=[Name()])
-    ]
-)
-FunctionDef(body=[Expr(), ..., Return()])
-Call(args=[Name(), *..., Attribute(), ..., ....])
+```bnf
+reference_pattern       ::= "~" NAME
 ```
 
-### Match String Pattern
+Reference patterns are query-bound variables that can be referred elsewhere and
+the truthness determined by checking whether all the references point to the
+same expression (structurally, not semantically) or not.
 
-If you are looking for all method definitions that suits to a single pattern, you can express
-them with match strings. Special patterns;
+#### Example Queries
 
-| Pattern        | Interpretation                     |
-|----------------|------------------------------------|
-| `%`            | matches zero or more characters    |
-| `_`            | matches exactly one character      |
-| `\%`/`\_`      | matches the literal `%`/`_`        |
+- Match a function definition where the last statement calls another function with
+  the same name
 
-The following pattern would match any of these given function names `a1_foo`, `xx_foo`,
-`b2_foo_bar`;
 ```py
 FunctionDef(
-    name = f"__\_foo%"
+    ~name,
+    body = [
+        *...,
+        Expr(Call(Name(~name)))
+    ]
 )
 ```
 
-### Atom Pattern
+- Match an if statement where the test is a compare operation with the same
+  lhs/rhs (`a == a` / `b() is b()`)
 
-Atom's are the literals (like string, integer) and the special `IGNORE` token. `IGNORE`
-is just like `pass`. It has no real effect but just being a place holder.
+```py
+If(
+    test = CompareOp(
+        left=~comp_expr,
+        comparators = [
+            ~comp_expr
+        ]
+    )
+)
+```
+
+### Atom Patterns
+
+```bnf
+atom_pattern            ::= NONE
+                         | STRING
+                         | NUMBER
+                         | IGNORE
+                         | "f" STRING
+```
+
+Atoms represents basic values (like integers, strings) and also some
+ReizQL-flavored constructs.
+
+#### Ignore
+
+```
+IGNORE                  ::= "..."
+```
+
+Ignore is a construct that just omits matching that field/element (in contrary
+to None, where it means that value does not exist).
+
+#### None
+
+```
+NONE                    ::= "None"
+```
+
+None represents the absence of the value
+
+#### Match String
+
+```
+MATCH_STRING            ::= "f" STRING
+```
+
+| Pattern | Interpretation |
+|----------------|------------------------------------| | `%` | matches zero or
+more characters | | `_` | matches exactly one character | | `\%`/`\_` | matches
+the literal `%`/`_` |
+
+Match strings can match alike strings via denoting some basic structures (like
+starts/ends with some static text).
+
+#### Example Queries
+
+- Match a string that starts with `http://` or `https://`
+
+```py
+Constant(f'http://%' & f'https://%') 
+```
+
+- Match an arg that doesn't have any type annotations
+
+```py
+arg(annotation = None)
+```
+
+### Builtin Matchers
+
+There are a couple of builtin matchers (builtin functions) that can match
+against certain conditions.
+
+#### `ALL`/`ANY`
+
+**Signature**: `ALL($0: pattern)` / `ANY($0: pattern)`
+
+Apply the given matcher (`$0`) to a sequence. `ALL` would check whether all
+elements can be matched through the given argument, and any would check if any
+of the elements would be matched.
+
+#### `LEN`
+
+**Signature**: `LEN($0: Opt[INTEGER], $1: Opt[INTEGER])`
+
+Checks whether the length of the sequence fits into `$0 <= <host AST> <= $1`.
+The `$0`/`$1` are optional values but at least one of them should be specified.
+
+#### `META`
+
+**Signature**: `META(**metadata_providers)`
+
+Checks for various metadata information (like file names, project names, parent
+types, etc).
+
+#### `I`
+
+**Signature**: `I($0: atom_pattern[MATCH_STRING])`
+
+Supports case insensitive match through match strings.
+
+#### Example Queries
+
+- Match a tuple where all members are literals
+
+```py
+Tuple(ALL(Constant()))
+```
+
+- Match a function where one of the top level statements is an if statement
+
+```py
+FunctionDef(
+    body = ANY(
+        If()
+    )
+)
+```
+
+- Match a function call where there are minimum 3 positional arguments and 5
+  maximum keyword arguments
+
+```py
+Call(
+    args = LEN(min=3),
+    keywords = LEN(max=5)
+)
+```
+
+- Match a string in an case insensitive way
+
+```py
+Constant(I(f"foo"))
+```

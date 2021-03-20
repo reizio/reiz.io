@@ -2,8 +2,8 @@
 
 # reiz.io
 
-Reiz is a structural source code search engine framework,
-with a built-in query language called [ReizQL](docs/reizql.md).
+Reiz is a structural source code search engine framework, with a built-in query
+language called [ReizQL](docs/reizql.md).
 
 ```
 Warehouse Preparation (reiz.schema):
@@ -38,6 +38,7 @@ Data Querying [ReizQL] (reiz.reizql):
         Generate IR from Reiz AST
 ```
 
-For creating a new instance, please check out the "[deploy guide](docs/deploy_guide.md)". For any
-other question, feel free to start up a new discussion on [#reiz channel on r/ProgrammingLanguages Discord server](https://discord.gg/r89x4EgZr4)
+For creating a new instance, please check out the "[deploy guide](docs/deploy_guide.md)".
+For any other question, feel free to start up a new discussion on
+[#reiz channel on r/ProgrammingLanguages Discord server](https://discord.gg/r89x4EgZr4)
 or on [GitHub discussions](https://github.com/reizio/reiz.io/discussions).

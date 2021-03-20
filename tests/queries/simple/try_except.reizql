@@ -1,0 +1,8 @@
+Try(
+    handlers = [
+        *...,
+        ExceptHandler(
+            type = None
+        )
+    ]
+)

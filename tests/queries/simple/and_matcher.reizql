@@ -1,0 +1,8 @@
+If(
+    body = [
+        Assign(),
+        *...,
+        Return()
+    ] & LEN(max=5)
+)
+

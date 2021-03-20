@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List
 
 from reiz.ir import IR
 from reiz.reizql.parser import grammar
-from reiz.serialization.transformers import ast
 
 if TYPE_CHECKING:
     BuiltinFunctionType = Callable[
