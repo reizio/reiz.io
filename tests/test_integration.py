@@ -11,16 +11,16 @@ PROJECT_PATH = Path(__file__).parent.parent
 STATIC_PATH = PROJECT_PATH / "static"
 
 
-def query(host, query_str, **query_kwargs):
+def query(query_str, host="http://localhost:8000/query/", **query_kwargs):
     query = {"query": query_str, **query_kwargs}
     query_data = json.dumps(query).encode()
     with urlopen(host, data=query_data) as page:
         return json.load(page)
 
 
-def health_check(host):
+def health_check():
     try:
-        query(host, "Name()")
+        query("Name()")
     except URLError:
         return False
     else:
