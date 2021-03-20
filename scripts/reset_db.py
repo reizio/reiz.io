@@ -50,6 +50,9 @@ def drop_and_load_db(schema, reboot_server=True):
 def main():
     parser = ArgumentParser()
     parser.add_argument("schema", type=Path)
+    parser.add_argument(
+        "--dont-reboot-server", action="store_false", dest="reboot_server"
+    )
     options = parser.parse_args()
     drop_and_load_db(**vars(options))
 

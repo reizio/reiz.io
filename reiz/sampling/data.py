@@ -20,7 +20,7 @@ class SamplingData:
             random.shuffle(dictified_instances)
 
         with open(data_file, "w") as stream:
-            json.dump(dictified_instances, stream)
+            json.dump(dictified_instances, stream, indent=4)
 
     @classmethod
     def load(cls, data_file, *, random_order=False):

@@ -96,7 +96,7 @@ def proccess_segment(segment):
     segment.clean_directory = segment.clean_directory.expanduser()
     if not segment.clean_directory.exists():
         raise ValueError(
-            f"Given ({segment.clean_directory!s}) clean_directory does not exist."
+            f"Data directory ({segment.clean_directory!s}) doesn't exist."
         )
 
 
