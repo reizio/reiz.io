@@ -1,10 +1,10 @@
 import json
+import time
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
 import pytest
-from requests.exceptions import ConnectionError
 
 PROJECT_PATH = Path(__file__).parent.parent
 STATIC_PATH = PROJECT_PATH / "static"
@@ -32,14 +32,12 @@ def docker_compose_file(pytestconfig):
 
 
 @pytest.fixture(scope="session")
-def reiz_service(docker_ip, docker_services):
-    port = docker_services.port_for("reiz", 8000)
-
-    url = f"http://{docker_ip}:{port}"
-    docker_services.wait_until_responsive(
-        timeout=1800, pause=30, check=lambda: health_check(url)
-    )
-    return url
+def reiz_service():
+    process = subprocess.Popen(["docker-compose", "up"])
+    while not health_check():
+        time.sleep(30)
+    yield
+    process.terminate()
 
 
 def test_reiz_web_api_basic(reiz_service):
