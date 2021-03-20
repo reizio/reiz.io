@@ -26,6 +26,6 @@ jobs:
         python -m pip install -e .
 
     - name: Test
-      run: pytest tests/integration/
+      run: pytest
 
 
