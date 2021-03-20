@@ -113,10 +113,11 @@ Each element on the right hand side have different fields with types attached to
 them. So the `BinOp()` node has 3 fields: `left`, `op`, `right` (respectively
 they mean left hand side, operator, right hand side of an arithmetic operation).
 `left` and the `right` must be another matcher from the `expr` base type (`BoolOp`
-/ `NamedExpr`, ...). The star (`*`) at the end of type implies that it requires
-a [list pattern](#list-pattern) that consists from that type (e.g `stmt*` might
-be something like `[If(), If(), While()]`). The question mark (`?`) indicates
-the value is optional and can be `None`.
+/ `NamedExpr`, ...). The star (`*`) at the end of type declaration implies that
+it requires a [sequential pattern](#list-patterns) where the member types
+inherit from that base type (e.g `stmt*` might be something like
+`[If(), If(), While()]`). The question mark (`?`) indicates the value is
+optional and can be `None`.
 
 If the values are not named (e.g `BinOp(Constant())`) then the name will be
 positionally given (`BinOp(Constant(), Add())` will be transformed to
@@ -144,5 +145,112 @@ IfExp(
         Name('a'),
         attr = 'b'
     )
+)
+```
+
+### Sequential Patterns
+
+```bnf
+sequential_pattern      ::= "[" ",".(pattern | "*" IGNORE)+ "]"
+```
+
+Sequential patterns represent a list of subpatterns that are combined together
+to match a list on the host AST. If we want to search a function definition
+where there are 2 statements, the first one being an if statement and the second
+one is a return of an identifier named `status` then we simply describe this
+query like this;
+
+```py
+FunctionDef(
+    body = [
+        If(),
+        Return(
+            Name('status')
+        )
+    ]
+)
+```
+
+Sequential patterns are ordered, and matched one-to-one unless a
+[ignore star](#ignore-star) is seen.
+
+#### Ignore Star
+
+If any of the elements on the sequence pattern is a star (`*`) followed by an
+[ignore](#ignore-atom) then the matchers before the ignore-star are relative
+from the beginning and the matchers after the ignore-star are relative to the
+end of the sequence. This implies that there is no maximum limit of items (in
+contrast to normal sequential patterns, where the number of elements is always
+fixed to amount of patterns seen) and the minimum being the total amount of
+matchers (excluding the ignore star).
+
+Let's say we want to find a function that starts with an if statement, and then
+ends with a call to `fetch` function.
+
+```py
+FunctionDef(
+    body = [
+        If(),
+        *...,
+        Return(
+            Call(
+                Name(
+                    'fetch'
+                )
+            )
+        )
+    ]
+)
+```
+
+There might be any number of elements between the if statement and the return,
+and it simply won't care.
+
+:::{note} If you need a filler value (for example you want the minimum number of
+statements to be 3 instead of 2 in the case above) you can use
+[ignore atom](#ignore-atom).
+
+```py
+FunctionDef(
+    body = [
+        If(),
+        ...,
+        *...,
+        Return(
+            Call(
+                Name(
+                    'fetch'
+                )
+            )
+        )
+    ]
+)
+```
+
+:::
+
+#### Example Queries
+
+- Match all functions that have 2 statements and the last being a return
+
+```py
+FunctionDef(
+    body = [
+        ...,
+        Return()
+    ]
+)
+```
+
+- Match me all try/except's where the last except handler is a bare `except: ...`
+
+```py
+Try(
+    handlers = [
+        *...,
+        ExceptHandler(
+            type = None
+        )
+    ]
 )
 ```
