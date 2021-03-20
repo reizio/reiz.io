@@ -26,9 +26,15 @@ def health_check(host):
 
 
 @pytest.fixture(scope="session")
+def docker_compose_file(pytestconfig):
+    return PROJECT_PATH / "docker-compose.yml"
+
+
+@pytest.fixture(scope="session")
 def reiz_service(docker_ip, docker_services):
-    docker_cfg = sync_config(STATIC_PATH / "configs" / "docker_config.json")
-    url = "http://{}:{}".format(docker_ip, 8000)
+    port = docker_services.port_for("reiz", 8000)
+
+    url = f"http://{docker_ip}:{port}"
     docker_services.wait_until_responsive(
         timeout=1800, pause=30, check=lambda: health_check(url)
     )

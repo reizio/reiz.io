@@ -6,9 +6,7 @@ from reiz.config import config
 
 
 def _apply_defaults(kwargs):
-    if hasattr(config.database, "options"):
-        kwargs.update(vars(config.database.options))
-
+    kwargs.update(vars(config.database.options))
     kwargs.setdefault("database", config.database.database)
     if not kwargs.get("host"):
         kwargs.setdefault("dsn", config.database.dsn)
