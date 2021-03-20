@@ -242,7 +242,7 @@ FunctionDef(
 )
 ```
 
-- Match me all try/except's where the last except handler is a bare `except: ...`
+- Match all try/except's where the last except handler is a bare `except: ...`
 
 ```py
 Try(
@@ -252,5 +252,118 @@ Try(
             type = None
         )
     ]
+)
+```
+
+### Logical Patterns
+
+Logical patterns are different patterns connected together in the sense of some
+logical operation (either `AND` or `OR`)
+
+#### AND patterns
+
+```bnf
+and_pattern             ::= pattern "&" pattern
+```
+
+`AND` patterns chains 2 different pattern together and matches the host value if
+it can be matched by both of the connected patterns.
+
+#### OR patterns
+
+```bnf
+or_pattern              ::= pattern "|" pattern
+```
+
+`OR` patterns chains 2 different pattern together and matches the host value if
+it can be matched by either of the connected patterns.
+
+#### Example Queries
+
+- Match a return statement that either returns a list literal or a tuple literal
+
+```py
+Return(List() | Tuple())
+```
+
+- Match an if statement where the first statement is an assign and the total
+  number of statements lower/equal than 5
+
+```py
+If(
+    body = [
+        Assign(),
+        *...
+    ] & LEN(max=5)
+)
+```
+
+### NOT Patterns
+
+```bnf
+negate_pattern          ::= "not" pattern
+```
+
+For checking whether a certain pattern *does not* match on the host AST, the
+negation operator can be used.
+
+:::{hint} If a value is described as an optional (`?`) on the ASDL, then the
+existence of value can be denoted via `not None` pattern. :::
+
+#### Example Queries
+
+- Match a return statement that doesn't return a call
+
+```py
+Return(not Call())
+```
+
+- A list that doesn't start with tuples or sets
+
+```py
+List(
+    elts = [
+        (not Tuple()) & (not List()),
+        *...
+    ]
+)
+```
+
+### Reference Patterns
+
+```bnf
+reference_pattern       ::= "~" NAME
+```
+
+A reference pattern is a query-bound variable that can be referred elsewhere and
+the truthness determined by checking whether all the references point to the
+same expression (structurally, not semantically) or not.
+
+#### Example Queries
+
+- Match a function definition where the last statement calls another function with
+  the same name
+
+```py
+FunctionDef(
+    ~name,
+    body = [
+        *...,
+        Expr(Call(Name(~name)))
+    ]
+)
+```
+
+- Match an if statement where the test is a compare operation with the same
+  lhs/rhs (`a == a` / `b() is b()`)
+
+```py
+If(
+    test = CompareOp(
+        left=~comp_expr,
+        comparators = [
+            ~comp_expr
+        ]
+    )
 )
 ```
