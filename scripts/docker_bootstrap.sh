@@ -11,7 +11,7 @@ pre_db () {
 
 post_db () {
     # shape the db
-    bash /app/scripts/regen_db.sh
+    python /app/scripts/create_db.py
 
     # serialize the dataset
     python -m reiz.serialization.serialize --fast \
