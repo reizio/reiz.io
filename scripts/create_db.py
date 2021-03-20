@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 
 import subprocess
-from argparse import ArgumentParser
-from contextlib import suppress
 from pathlib import Path
-
-from edgedb.errors import InvalidReferenceError
 
 from reiz.database import get_new_connection
 from reiz.utilities import logger

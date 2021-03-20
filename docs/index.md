@@ -1,9 +1,8 @@
 # reiz.io
 
-reiz.io is a structural source code search engine for
-Python. Compared to the popular alternatives (e.g Github
-Code Search) it executes queries over the syntax trees
-(instead of raw source code) and tries to retrive structural
+reiz.io is a structural source code search engine for Python. Compared to the
+popular alternatives (e.g Github Code Search) it executes queries over the
+syntax trees (instead of raw source code) and tries to retrive structural
 knowledge (no semantics applied).
 
 ```{toctree}
@@ -15,10 +14,9 @@ reizql
 
 ## A gentle introduction
 
-Reiz is the code search framework that reiz.io is built
-a top on. Due to it's nature, it solely works with the ASTs
-and intentionally avoids doing any semantical work.
-
+Reiz is the code search framework that reiz.io is built a top on. Due to it's
+nature, it solely works with the ASTs and intentionally avoids doing any
+semantical work.
 
 ```{note}
 Some ASTs attach a bit of contextual knowledge (e.g `Name(ctx=...)`
@@ -27,30 +25,16 @@ reiz.io doesn't include them when comparing references (see
 matchers#reference-matcher for details).
 ```
 
-Here is a simple ReizQL query that searches for a function that
-ends with a try statement where we return a call to a function that
-has the same name as the function we are within. 
+Here is a simple ReizQL query that searches for a function that ends with a try
+statement where we return a call to a function that has the same name as the
+function we are within.
 
 ```python
-FunctionDef(
-    ~func,
-    body = [
-        *...,
-        Try(
-            body = [
-                Return(
-                    Call(
-                        Name(~func)
-                    )
-                )
-            ]
-        )
-    
-    ]
-)
+FunctionDef(~func, body=[*..., Try(body=[Return(Call(Name(~func)))])])
 ```
 
 which would match the following;
+
 ```py
 def foo(spam):
     eggs = bar()
@@ -60,8 +44,9 @@ def foo(spam):
         return None
 ```
 
-In the very basic sense, it is generating the AST of the code above
-and checks whether it fits the *pattern* (ReizQL query) or not.;
+In the very basic sense, it is generating the AST of the code above and checks
+whether it fits the *pattern* (ReizQL query) or not.;
+
 ```py
 FunctionDef(
     name='foo',
