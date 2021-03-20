@@ -52,12 +52,11 @@ and_pattern             ::= pattern "&" pattern
 match_pattern           ::= NAME "(" ",".argument+ ")"
 sequential_pattern      ::= "[" ",".(pattern | "*" IGNORE)+ "]"
 reference_pattern       ::= "~" NAME
-match_string_pattern    ::= "f" STRING
-
 atom_pattern            ::= NONE
                          | STRING
                          | NUMBER
                          | IGNORE
+                         | "f" STRING
 
 argument                ::= pattern
                          | NAME "=" pattern
@@ -335,7 +334,7 @@ List(
 reference_pattern       ::= "~" NAME
 ```
 
-A reference pattern is a query-bound variable that can be referred elsewhere and
+Reference patterns are query-bound variables that can be referred elsewhere and
 the truthness determined by checking whether all the references point to the
 same expression (structurally, not semantically) or not.
 
@@ -366,4 +365,129 @@ If(
         ]
     )
 )
+```
+
+### Atom Patterns
+
+```bnf
+atom_pattern            ::= NONE
+                         | STRING
+                         | NUMBER
+                         | IGNORE
+                         | "f" STRING
+```
+
+Atoms represents basic values (like integers, strings) and also some
+ReizQL-flavored constructs.
+
+#### Ignore
+
+```
+IGNORE                  ::= "..."
+```
+
+Ignore is a construct that just omits matching that field/element (in contrary
+to None, where it means that value does not exist).
+
+#### None
+
+```
+NONE                    ::= "None"
+```
+
+None represents the absence of the value
+
+#### Match String
+
+```
+MATCH_STRING            ::= "f" STRING
+```
+
+| Pattern | Interpretation |
+|----------------|------------------------------------| | `%` | matches zero or
+more characters | | `_` | matches exactly one character | | `\%`/`\_` | matches
+the literal `%`/`_` |
+
+Match strings can match alike strings via denoting some basic structures (like
+starts/ends with some static text).
+
+#### Example Queries
+
+- Match a string that starts with `http://` or `https://`
+
+```py
+Constant(f'http://%' & f'https://%') 
+```
+
+- Match an arg that doesn't have any type annotations
+
+```py
+arg(annotation = None)
+```
+
+### Builtin Matchers
+
+There are a couple of builtin matchers (builtin functions) that can match
+against certain conditions.
+
+#### `ALL`/`ANY`
+
+**Signature**: `ALL($0: pattern)` / `ANY($0: pattern)`
+
+Apply the given matcher (`$0`) to a sequence. `ALL` would check whether all
+elements can be matched through the given argument, and any would check if any
+of the elements would be matched.
+
+#### `LEN`
+
+**Signature**: `LEN($0: Opt[INTEGER], $1: Opt[INTEGER])`
+
+Checks whether the length of the sequence fits into `$0 <= <host AST> <= $1`.
+The `$0`/`$1` are optional values but at least one of them should be specified.
+
+#### `META`
+
+**Signature**: `META(**metadata_providers)`
+
+Checks for various metadata information (like file names, project names, parent
+types, etc).
+
+#### `I`
+
+**Signature**: `I($0: atom_pattern[MATCH_STRING])`
+
+Supports case insensitive match through match strings.
+
+#### Example Queries
+
+- Match a tuple where all members are literals
+
+```py
+Tuple(ALL(Constant()))
+```
+
+- Match a function where one of the top level statements is an if statement
+
+```py
+FunctionDef(
+    body = ANY(
+        If()
+    )
+)
+```
+
+- Match a function call where there are minimum 3 positional arguments and 5
+  maximum keyword arguments
+
+```py
+Call(
+    args = LEN(min=3),
+    keywords = LEN(max=5)
+)
+```
+
+- Match a string in an case insensitive way
+
+```py
+Constant(I(f"foo"))
 ```
