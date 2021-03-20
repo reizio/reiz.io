@@ -10,7 +10,7 @@ cp static/configs/docker_config.json ~/.local/reiz.json
 
 # create the dataset
 python -m reiz.sampling.get_dataset \
-          --limit 1 /app/tmp/dataset.json
+          --limit 10 /app/tmp/dataset.json
 
 # fetch the dataset
 python -m reiz.sampling.fetch_dataset \

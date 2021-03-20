@@ -6,7 +6,7 @@ on:
     branches:
       - '*'
 
-name: Functional Tests
+name: Tests
 
 jobs:
   test:
@@ -50,5 +50,3 @@ jobs:
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
-
-
