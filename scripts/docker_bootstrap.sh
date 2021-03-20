@@ -1,3 +1,23 @@
+pre_db () {
+    # create the dataset
+    python -m reiz.sampling.get_dataset \
+              --limit 10 /app/tmp/dataset.json
+
+    # fetch the dataset
+    python -m reiz.sampling.fetch_dataset \
+              /app/tmp/dataset.json /app/tmp/data \
+              --ignore-tests
+}
+
+post_db () {
+    # shape the db
+    bash /app/scripts/regen_db.sh
+
+    # serialize the dataset
+    python -m reiz.serialization.serialize --fast \
+              /app/tmp/dataset.json /app/tmp/data
+}
+
 #!/usr/bin/bash
 set -xe
 
@@ -8,24 +28,9 @@ mkdir -p ~/.local/
 # copy the config
 cp static/configs/docker_config.json ~/.local/reiz.json
 
-# create the dataset
-python -m reiz.sampling.get_dataset \
-          --limit 10 /app/tmp/dataset.json
-
-# fetch the dataset
-python -m reiz.sampling.fetch_dataset \
-          /app/tmp/dataset.json /app/tmp/data \
-          --ignore-tests
-
-# await database
-sleep 5
-
-# shape the db
-bash /app/scripts/regen_db.sh
-
-# serialize the dataset
-python -m reiz.serialization.serialize --fast \
-          /app/tmp/dataset.json /app/tmp/data
+pre_db
+sleep 15 # await database
+post_db
 
 # start the webserver
-python -m reiz.web.asgi
+python -m reiz.web.api

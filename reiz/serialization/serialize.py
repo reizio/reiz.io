@@ -20,7 +20,11 @@ def insert_dataset(data_file, clean_directory, workers=2, fast=False):
 
         def create_tasks(amount):
             tasks = set()
-            for instance in random.sample(instances, k=amount):
+            for instance in random.sample(
+                instances, k=min(amount, len(instances))
+            ):
+                if instance in bound_instances.values():
+                    continue
                 task = executor.submit(
                     insert_project, instance, limit=FILE_LIMIT, fast=fast
                 )

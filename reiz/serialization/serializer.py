@@ -214,6 +214,7 @@ def insert_project(instance, *, limit=None, fast=False):
         instance.name, instance.git_source, instance.git_revision
     )
 
+    logger.info(f"{instance.name} insertion lock acquired")
     with get_new_connection() as connection:
         sync_global_cache(connection)
         if project.name not in PROJECT_CACHE:
@@ -232,4 +233,5 @@ def insert_project(instance, *, limit=None, fast=False):
             if insert_file(file_context) is Insertion.INSERTED:
                 total_inserted += 1
 
+    logger.info(f"{instance.name} insertion lock released")
     return total_inserted
