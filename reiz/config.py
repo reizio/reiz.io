@@ -74,13 +74,14 @@ class validator:
 
     def cast(self, segment, field, kind):
         original = getattr(segment, field)
-        if not isinstance(original, kind):
-            setattr(segment, field, kind(original))
+        setattr(segment, field, kind(original))
 
 
 @validator.segment("database", requirements=["dsn", "database"])
 def process_segment(segment):
     validator.set_if_not_already(segment, "cluster")
+    validator.set_if_not_already(segment, "options", SimpleNamespace())
+    validator.cast(segment, "options", vars)
 
 
 @validator.segment("redis")
@@ -96,7 +97,7 @@ def proccess_segment(segment):
     segment.clean_directory = segment.clean_directory.expanduser()
     if not segment.clean_directory.exists():
         raise ValueError(
-            f"Given ({segment.clean_directory!s}) clean_directory does not exist."
+            f"Data directory ({segment.clean_directory!s}) doesn't exist."
         )
 
 

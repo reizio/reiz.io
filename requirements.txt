@@ -1,3 +1,4 @@
+pyasdl
 edgedb
 aioredis
 black==20.8b1

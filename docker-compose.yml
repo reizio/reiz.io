@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  reiz:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - "edgedb"
+  edgedb:
+    image: edgedb/edgedb:20210320022940b2b91d
+    ports:
+      - "5656:5656"
+    volumes:
+      - ./data:/var/lib/edgedb/data
+    environment:
+      - EDGEDB_PASSWORD=edgedb
