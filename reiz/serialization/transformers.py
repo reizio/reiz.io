@@ -50,6 +50,8 @@ def calculate_node_tag(node):
         return node.raw_tag
     elif node is None:
         return -1
+    elif not isinstance(node, ast.AST):
+        return node
 
     tag = [node.type_id]
     for field, value in ast.iter_fields(node):
