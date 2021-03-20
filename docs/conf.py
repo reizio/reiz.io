@@ -35,6 +35,8 @@ extensions = [
     "sphinx.ext.viewcode",
 ]
 
+myst_enable_extensions = ["html_admonition", "colon_fence"]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
