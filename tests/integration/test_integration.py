@@ -5,8 +5,6 @@ from urllib.request import urlopen
 import pytest
 from requests.exceptions import ConnectionError
 
-from reiz.config import sync_config
-
 PROJECT_PATH = Path(__file__).parent.parent
 STATIC_PATH = PROJECT_PATH / "static"
 
@@ -30,10 +28,9 @@ def health_check(host):
 @pytest.fixture(scope="session")
 def reiz_service(docker_ip, docker_services):
     docker_cfg = sync_config(STATIC_PATH / "configs" / "docker_config.json")
-    port = docker_services.port_for("reiz", docker_cfg.web.port)
-    url = "http://{}:{}".format(docker_ip, port)
+    url = "http://{}:{}".format(docker_ip, 8000)
     docker_services.wait_until_responsive(
-        timeout=30.0, pause=0.1, check=lambda: health_check(url)
+        timeout=1800, pause=30, check=lambda: health_check(url)
     )
     return url
 
