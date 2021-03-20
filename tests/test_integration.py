@@ -21,7 +21,7 @@ def query(query_str, host="http://localhost:8000/query/", **query_kwargs):
 def health_check():
     try:
         query("Name()")
-    except URLError:
+    except (URLError, ConnectionResetError):
         return False
     else:
         return True
