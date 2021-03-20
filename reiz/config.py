@@ -74,8 +74,7 @@ class validator:
 
     def cast(self, segment, field, kind):
         original = getattr(segment, field)
-        if not isinstance(original, kind):
-            setattr(segment, field, kind(original))
+        setattr(segment, field, kind(original))
 
 
 @validator.segment("database", requirements=["dsn", "database"])

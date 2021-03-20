@@ -124,3 +124,6 @@ rawdata/
 errors.log
 results.log
 sampling_data
+
+data/
+tmp/
