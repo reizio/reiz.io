@@ -20,7 +20,7 @@
 project = "reiz.io"
 copyright = "2021, isidentical"
 author = "isidentical"
-
+html_logo = "logo.png"
 
 # -- General configuration ---------------------------------------------------
 
