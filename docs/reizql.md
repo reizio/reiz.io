@@ -67,7 +67,7 @@ NAME                    ::= "a".."Z"
 NUMBER                  ::= INTEGER | FLOAT
 ```
 
-### Match Patterns
+## Match Patterns
 
 ```bnf
 match_pattern           ::= NAME "(" ",".argument+ ")"
@@ -122,7 +122,7 @@ If the values are not named (e.g `BinOp(Constant())`) then the name will be
 positionally given (`BinOp(Constant(), Add())` will be transformed to
 `BinOp(left=Constant(), op=Add()`).
 
-#### Example Queries
+### Example Queries
 
 - Match the `1994` literal
 
@@ -147,7 +147,7 @@ IfExp(
 )
 ```
 
-### Sequential Patterns
+## Sequential Patterns
 
 ```bnf
 sequential_pattern      ::= "[" ",".(pattern | "*" IGNORE)+ "]"
@@ -173,7 +173,7 @@ FunctionDef(
 Sequential patterns are ordered, and matched one-to-one unless a
 [ignore star](#ignore-star) is seen.
 
-#### Ignore Star
+### Ignore Star
 
 If any of the elements on the sequence pattern is a star (`*`) followed by an
 [ignore](#ignore-atom) then the matchers before the ignore-star are relative
@@ -228,7 +228,7 @@ FunctionDef(
 
 :::
 
-#### Example Queries
+### Example Queries
 
 - Match all functions that have 2 statements and the last being a return
 
@@ -254,12 +254,12 @@ Try(
 )
 ```
 
-### Logical Patterns
+## Logical Patterns
 
 Logical patterns are different patterns connected together in the sense of some
 logical operation (either `AND` or `OR`)
 
-#### AND patterns
+### AND patterns
 
 ```bnf
 and_pattern             ::= pattern "&" pattern
@@ -268,7 +268,7 @@ and_pattern             ::= pattern "&" pattern
 `AND` patterns chains 2 different pattern together and matches the host value if
 it can be matched by both of the connected patterns.
 
-#### OR patterns
+### OR patterns
 
 ```bnf
 or_pattern              ::= pattern "|" pattern
@@ -277,7 +277,7 @@ or_pattern              ::= pattern "|" pattern
 `OR` patterns chains 2 different pattern together and matches the host value if
 it can be matched by either of the connected patterns.
 
-#### Example Queries
+### Example Queries
 
 - Match a return statement that either returns a list literal or a tuple literal
 
@@ -297,7 +297,7 @@ If(
 )
 ```
 
-### NOT Patterns
+## NOT Patterns
 
 ```bnf
 negate_pattern          ::= "not" pattern
@@ -307,9 +307,9 @@ For checking whether a certain pattern *does not* match on the host AST, the
 negation operator can be used.
 
 :::{hint} If a value is described as an optional (`?`) on the ASDL, then the
-existence of value can be denoted via `not None` pattern. :::
+existence of value can be denoted via `not None` pattern.
 
-#### Example Queries
+### Example Queries
 
 - Match a return statement that doesn't return a call
 
@@ -328,7 +328,7 @@ List(
 )
 ```
 
-### Reference Patterns
+## Reference Patterns
 
 ```bnf
 reference_pattern       ::= "~" NAME
@@ -338,7 +338,7 @@ Reference patterns are query-bound variables that can be referred elsewhere and
 the truthness determined by checking whether all the references point to the
 same expression (structurally, not semantically) or not.
 
-#### Example Queries
+### Example Queries
 
 - Match a function definition where the last statement calls another function with
   the same name
@@ -367,7 +367,7 @@ If(
 )
 ```
 
-### Atom Patterns
+## Atom Patterns
 
 ```bnf
 atom_pattern            ::= NONE
@@ -380,7 +380,7 @@ atom_pattern            ::= NONE
 Atoms represents basic values (like integers, strings) and also some
 ReizQL-flavored constructs.
 
-#### Ignore
+### Ignore
 
 ```
 IGNORE                  ::= "..."
@@ -389,7 +389,7 @@ IGNORE                  ::= "..."
 Ignore is a construct that just omits matching that field/element (in contrary
 to None, where it means that value does not exist).
 
-#### None
+### None
 
 ```
 NONE                    ::= "None"
@@ -397,7 +397,7 @@ NONE                    ::= "None"
 
 None represents the absence of the value
 
-#### Match String
+### Match String
 
 ```
 MATCH_STRING            ::= "f" STRING
@@ -411,7 +411,7 @@ the literal `%`/`_` |
 Match strings can match alike strings via denoting some basic structures (like
 starts/ends with some static text).
 
-#### Example Queries
+### Example Queries
 
 - Match a string that starts with `http://` or `https://`
 
@@ -425,12 +425,12 @@ Constant(f'http://%' & f'https://%')
 arg(annotation = None)
 ```
 
-### Builtin Matchers
+## Builtin Matchers
 
 There are a couple of builtin matchers (builtin functions) that can match
 against certain conditions.
 
-#### `ALL`/`ANY`
+### ALL/ANY
 
 **Signature**: `ALL($0: pattern)` / `ANY($0: pattern)`
 
@@ -438,27 +438,27 @@ Apply the given matcher (`$0`) to a sequence. `ALL` would check whether all
 elements can be matched through the given argument, and any would check if any
 of the elements would be matched.
 
-#### `LEN`
+### LEN
 
 **Signature**: `LEN($0: Opt[INTEGER], $1: Opt[INTEGER])`
 
 Checks whether the length of the sequence fits into `$0 <= <host AST> <= $1`.
 The `$0`/`$1` are optional values but at least one of them should be specified.
 
-#### `META`
+### META
 
 **Signature**: `META(**metadata_providers)`
 
 Checks for various metadata information (like file names, project names, parent
 types, etc).
 
-#### `I`
+### I
 
 **Signature**: `I($0: atom_pattern[MATCH_STRING])`
 
 Supports case insensitive match through match strings.
 
-#### Example Queries
+### Example Queries
 
 - Match a tuple where all members are literals
 
