@@ -8,6 +8,13 @@ services:
       - .:/app
     depends_on:
       - "edgedb"
+  web:
+    build:
+        context: static/ui/
+    ports:
+      - "8080:8080"
+    depends_on:
+      - "reiz"
   edgedb:
     image: edgedb/edgedb:20210320022940b2b91d
     ports:
