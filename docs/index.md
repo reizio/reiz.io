@@ -10,6 +10,7 @@ knowledge (no semantics applied).
 :maxdepth: 1
 
 reizql
+internals
 ```
 
 ## A gentle introduction

@@ -2,43 +2,102 @@
 
 # reiz.io
 
-Reiz is a structural source code search engine framework, with a built-in query
-language called [ReizQL](docs/reizql.md).
+reiz.io is a structural source code search engine for Python. Compared to the
+popular alternatives (e.g Github Code Search) it executes queries over the
+syntax trees (instead of raw source code) and tries to retrive structural
+knowledge (no semantics applied). For more information, please see the
+[docs](https://reizio.readthedocs.io/en/latest/).
 
-```
-Warehouse Preparation (reiz.schema):
-    -> reiz.schema.builders.$DB
-        Build a schema from the given ASDL file
-    -> reiz.schema.$DB
-        Store schema metadata for the specific database
+## A gentle introduction
 
-Data Collection (reiz.sampling):
-    -> reiz.sampling.get_dataset
-        Get a list of possible projects with cross references to their SCM pages
-    -> reiz.sampling.fetch_dataset
-        Download the given list of projects
-    -> reiz.sampling.sanitize_dataset
-        Remove everything beside valid Python 3 source code files
+Reiz is the code search framework that reiz.io is built a top on. Due to it's
+nature, it solely works with the ASTs and intentionally avoids doing any
+semantical work.
 
-Data Serialization (reiz.serialization):
-    -> reiz.serialization.transformers
-        Transform and annotate the raw language AST for querying
-    -> reiz.serialization.serializer
-        Serialize all source files in a single project to the database
-    -> reiz.serialization.serialize
-        Serialize all downloaded projects to the database
-
-Data Querying [ReizQL] (reiz.reizql):
-    -> reiz.reizql.parser
-        -> reiz.reizql.parser.grammar
-            Represent Reiz AST
-        -> reiz.reizql.parser.parse
-            Generate Reiz AST from ReizQL
-    -> reiz.reizql.compiler
-        Generate IR from Reiz AST
+```{note}
+Some ASTs attach a bit of contextual knowledge (e.g `Name(ctx=...)`
+on python) which can be queried through simple matcher queries but
+reiz.io doesn't include them when comparing references (see
+matchers#reference-matcher for details).
 ```
 
-For creating a new instance, please check out the "[deploy guide](docs/deploy_guide.md)".
-For any other question, feel free to start up a new discussion on
-[#reiz channel on r/ProgrammingLanguages Discord server](https://discord.gg/r89x4EgZr4)
-or on [GitHub discussions](https://github.com/reizio/reiz.io/discussions).
+Here is a simple ReizQL query that searches for a function that ends with a try
+statement where we return a call to a function that has the same name as the
+function we are within.
+
+```python
+FunctionDef(~func, body=[*..., Try(body=[Return(Call(Name(~func)))])])
+```
+
+which would match the following;
+
+```py
+def foo(spam):
+    eggs = bar()
+    try:
+        return foo(spam + eggs)
+    except ValueError:
+        return None
+```
+
+In the very basic sense, it is generating the AST of the code above and checks
+whether it fits the *pattern* (ReizQL query) or not.;
+
+```py
+FunctionDef(
+    name='foo',
+    args=arguments(
+        posonlyargs=[],
+        args=[arg(arg='spam', annotation=None, type_comment=None)],
+        vararg=None,
+        kwonlyargs=[],
+        kw_defaults=[],
+        kwarg=None,
+        defaults=[],
+    ),
+    body=[
+        Assign(
+            targets=[Name(id='eggs', ctx=Store())],
+            value=Call(
+                func=Name(id='bar', ctx=Load()),
+                args=[],
+                keywords=[],
+            ),
+            type_comment=None,
+        ),
+        Try(
+            body=[
+                Return(
+                    value=Call(
+                        func=Name(id='foo', ctx=Load()),
+                        args=[
+                            BinOp(
+                                left=Name(id='spam', ctx=Load()),
+                                op=Add(),
+                                right=Name(id='eggs', ctx=Load()),
+                            ),
+                        ],
+                        keywords=[],
+                    ),
+                ),
+            ],
+            handlers=[
+                ExceptHandler(
+                    type=Name(id='ValueError', ctx=Load()),
+                    name=None,
+                    body=[
+                        Return(
+                            value=Constant(value=None, kind=None),
+                        ),
+                    ],
+                ),
+            ],
+            orelse=[],
+            finalbody=[],
+        ),
+    ],
+    decorator_list=[],
+    returns=None,
+    type_comment=None,
+)
+```
