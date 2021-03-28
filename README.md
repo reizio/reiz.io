@@ -1,4 +1,4 @@
-<p align="center"><img src="https://github.com/reizio/reiz.io/blob/master/static/assets/reiz.png"></p>
+<p align="center"><img src="https://github.com/reizio/reiz.io/blob/master/docs/logo.png"></p>
 
 # reiz.io
 
