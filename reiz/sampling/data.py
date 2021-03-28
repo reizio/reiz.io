@@ -10,8 +10,7 @@ class SamplingData:
     downloads: int
     git_source: str
     git_revision: Optional[str] = None
-
-    dump = asdict
+    license_type: Optional[str] = None
 
     @staticmethod
     def dump(data_file, instances, *, random_order=False):

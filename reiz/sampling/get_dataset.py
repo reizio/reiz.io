@@ -37,6 +37,7 @@ def _contains(item):
 def get_sampling_data(project, download_count):
     package_response = json_request(PYPI_INSTANCE + f"/{project}/json")
     if info := package_response.get("info"):
+        license_type = info.get("license") or None
         links = info.get("project_urls") or {}
 
         for _, link in sorted(links.items(), key=_contains):
@@ -45,7 +46,9 @@ def get_sampling_data(project, download_count):
         else:
             return None
 
-    return SamplingData(project, download_count, link)
+    return SamplingData(
+        project, download_count, link, license_type=license_type
+    )
 
 
 def get_pypi_dataset(data_file, workers=4, limit=500):
