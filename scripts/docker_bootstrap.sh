@@ -5,8 +5,12 @@ pre_db () {
 
     # fetch the dataset
     python -m reiz.sampling.fetch_dataset \
-              /app/tmp/dataset.json /app/tmp/data \
-              --ignore-tests
+              /app/tmp/dataset.json /app/tmp/rawdata
+
+    # sanitize the dataset
+    python -m reiz.sampling.sanitize_dataset \
+              /app/tmp/dataset.json /app/tmp/rawdata \
+              /app/tmp/data --ignore-tests
 }
 
 post_db () {
