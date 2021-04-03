@@ -4,11 +4,12 @@ import subprocess
 import tokenize
 import warnings
 from argparse import ArgumentParser
-from concurrent.futures import as_completed
+from concurrent import futures
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from reiz.sampling import SamplingData
-from reiz.utilities import get_executor, guarded, logger
+from reiz.utilities import guarded, logger
 
 
 def source_code(path: Path):
@@ -68,7 +69,7 @@ def sanitize_dataset(
     clean_directory.mkdir(exist_ok=True)
 
     instances = SamplingData.load(data_file)
-    with get_executor(workers) as executor:
+    with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = [
             executor.submit(
                 sanitize,
@@ -80,7 +81,7 @@ def sanitize_dataset(
             )
             for instance in instances
         ]
-        for future in as_completed(futures):
+        for future in futures.as_completed(futures):
             instance = future.result()
             if instance is None:
                 continue

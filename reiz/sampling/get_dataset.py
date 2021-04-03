@@ -1,9 +1,10 @@
 from argparse import ArgumentParser
-from concurrent.futures import as_completed
+from concurrent import futures
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from reiz.sampling import SamplingData
-from reiz.utilities import get_executor, guarded, json_request, logger
+from reiz.utilities import guarded, json_request, logger
 
 PYPI_INSTANCE = "https://pypi.org/pypi"
 PYPI_DATSET_URL = "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-365-days.json"
@@ -55,13 +56,13 @@ def get_pypi_dataset(data_file, workers=4, limit=500):
     response = json_request(PYPI_DATSET_URL)
     instances = []
 
-    with get_executor(workers) as executor:
+    with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = [
             executor.submit(get_sampling_data, **package)
             for package in response["rows"]
         ]
 
-        for future in as_completed(futures):
+        for future in futures.as_completed(futures):
             instance = future.result()
             if instance is None:
                 continue

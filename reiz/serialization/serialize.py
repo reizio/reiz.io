@@ -2,6 +2,7 @@ import random
 import warnings
 from argparse import ArgumentParser
 from concurrent import futures
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from reiz.sampling import SamplingData
@@ -16,7 +17,7 @@ def insert_dataset(data_file, clean_directory, workers=2, fast=False):
     instances = SamplingData.load(data_file, random_order=True)
     bound_instances = {}
 
-    with futures.ThreadPoolExecutor(max_workers=workers) as executor:
+    with ThreadPoolExecutor(max_workers=workers) as executor:
 
         def create_tasks(amount):
             tasks = set()

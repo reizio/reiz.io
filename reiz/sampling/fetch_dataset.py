@@ -2,11 +2,12 @@ import shutil
 import subprocess
 import warnings
 from argparse import ArgumentParser
-from concurrent.futures import as_completed
+from concurrent import futures
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from reiz.sampling import SamplingData
-from reiz.utilities import get_executor, guarded, logger
+from reiz.utilities import guarded, logger
 
 
 @guarded
@@ -40,7 +41,7 @@ def checkout_sampling_data(checkout_directory, instance, force):
 
 @guarded
 def fetch(instances, checkout_directory, workers, force):
-    with get_executor(workers) as executor:
+    with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = [
             executor.submit(
                 checkout_sampling_data,
@@ -50,7 +51,7 @@ def fetch(instances, checkout_directory, workers, force):
             )
             for instance in instances
         ]
-        for future in as_completed(futures):
+        for future in futures.as_completed(futures):
             instance = future.result()
             if instance is None:
                 continue

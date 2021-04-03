@@ -1,11 +1,9 @@
 import json
 import logging
 import sys
-from concurrent.futures import ProcessPoolExecutor
 from enum import Enum
 from functools import partialmethod, wraps
 from pathlib import Path
-from typing import ContextManager
 from urllib.request import urlopen
 
 try:
@@ -43,10 +41,6 @@ formatter = logging.Formatter("[%(asctime)s] %(funcName)-15s --- %(message)s")
 handler.setFormatter(formatter)
 
 logger.addHandler(handler)
-
-
-def get_executor(workers: int) -> ContextManager:
-    return ProcessPoolExecutor(max_workers=workers)
 
 
 def guarded(func):
