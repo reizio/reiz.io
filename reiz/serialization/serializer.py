@@ -8,7 +8,7 @@ from enum import Enum, auto
 from functools import cached_property, singledispatch
 
 from reiz.config import config
-from reiz.database import get_new_connection
+from reiz.database import DatabaseConnection, get_new_connection
 from reiz.ir import IR, Schema
 from reiz.serialization.transformers import iter_properties, prepare_ast
 from reiz.utilities import guarded, logger
@@ -37,7 +37,7 @@ class Insertion(Enum):
 class SerializationContext:
     path: Path
     project: ast.project
-    connection: DBConnection
+    connection: DatabaseConnection
     fast_mode: bool = False
 
     stack: List[ast.AST] = field(default_factory=list)

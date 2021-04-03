@@ -4,6 +4,8 @@ import edgedb
 
 from reiz.config import config
 
+DatabaseConnection = edgedb.blocking_con.BlockingIOConnection
+
 
 def _apply_defaults(kwargs):
     if config.database.options:
