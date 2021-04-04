@@ -8,7 +8,7 @@
         "cache": false
     },
     "data": {
-        "clean_directory": ".temp_reiz/"
+        "path": ".temp_reiz/"
     },
     "web": {
         "host": "127.0.0.1",

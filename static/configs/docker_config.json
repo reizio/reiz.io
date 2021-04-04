@@ -7,7 +7,7 @@
         "cache": false
     },
     "data": {
-        "clean_directory": "/app/tmp/data"
+        "path": "/app/tmp/data"
     },
     "web": {
         "host": "127.0.0.1",

@@ -6,7 +6,7 @@ from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from reiz.sampling import SamplingData
+from reiz.sampling import dump_dataset, load_dataset
 from reiz.utilities import guarded, logger
 
 
@@ -64,9 +64,9 @@ def fetch(projects, checkout_directory, workers, force):
 def fetch_dataset(data_file, checkout_directory, force=False, workers=4):
     checkout_directory.mkdir(exist_ok=True)
 
-    projects = SamplingData.load(data_file)
+    projects = load_dataset(data_file)
     projects = list(fetch(projects, checkout_directory, workers, force))
-    SamplingData.dump(data_file, projects)
+    dump_dataset(data_file, projects)
 
 
 def main():

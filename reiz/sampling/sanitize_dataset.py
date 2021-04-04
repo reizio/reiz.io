@@ -8,7 +8,7 @@ from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from reiz.sampling import SamplingData
+from reiz.sampling import load_dataset
 from reiz.utilities import guarded, logger
 
 
@@ -68,7 +68,7 @@ def sanitize_dataset(
 ):
     clean_directory.mkdir(exist_ok=True)
 
-    projects = SamplingData.load(data_file)
+    projects = load_dataset(data_file)
     with ProcessPoolExecutor(max_workers=workers) as executor:
         tasks = [
             executor.submit(

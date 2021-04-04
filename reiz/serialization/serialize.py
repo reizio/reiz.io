@@ -5,7 +5,7 @@ from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from reiz.sampling import SamplingData
+from reiz.sampling import load_dataset
 from reiz.serialization.context import GlobalContext
 from reiz.serialization.serializer import insert_project
 from reiz.utilities import logger
@@ -15,7 +15,7 @@ FILE_LIMIT = 10
 
 
 def insert_dataset(data_file, clean_directory, workers=2, fast=False):
-    instances = SamplingData.load(data_file, random_order=True)
+    instances = load_dataset(data_file)
     bound_instances = {}
 
     global_ctx = GlobalContext(

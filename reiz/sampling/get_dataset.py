@@ -3,7 +3,7 @@ from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from reiz.sampling import SamplingData
+from reiz.sampling import SamplingData, dump_dataset
 from reiz.utilities import guarded, json_request, logger
 
 PYPI_INSTANCE = "https://pypi.org/pypi"
@@ -79,7 +79,7 @@ def get_pypi_dataset(data_file, workers=4, limit=500):
         len(projects),
         str(data_file),
     )
-    SamplingData.dump(data_file, projects)
+    dump_dataset(data_file, projects)
 
 
 def main():
