@@ -1,88 +1,21 @@
 from __future__ import annotations
 
 import ast
-import tokenize
-from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import field
 from enum import Enum, auto
-from functools import cached_property, singledispatch
+from functools import singledispatch
 
-from reiz.config import config
-from reiz.database import DatabaseConnection, get_new_connection
+from reiz.database import get_new_connection
 from reiz.ir import IR, Schema
-from reiz.serialization.transformers import iter_properties, prepare_ast
+from reiz.serialization.context import GlobalContext
+from reiz.serialization.transformers import iter_properties
 from reiz.utilities import guarded, logger
-
-FILE_CACHE = frozenset()
-PROJECT_CACHE = frozenset()
-
-
-def sync_global_cache(connection):
-    global FILE_CACHE, PROJECT_CACHE
-
-    query_set = connection.query(IR.query("module.filenames"))
-    FILE_CACHE = frozenset(module.filename for module in query_set)
-
-    query_set = connection.query(IR.query("project.names"))
-    PROJECT_CACHE = frozenset(project.name for project in query_set)
 
 
 class Insertion(Enum):
     CACHED = auto()
     SKIPPED = auto()
     INSERTED = auto()
-
-
-@dataclass
-class SerializationContext:
-    path: Path
-    project: ast.project
-    connection: DatabaseConnection
-    fast_mode: bool = False
-
-    stack: List[ast.AST] = field(default_factory=list)
-    properties: Dict[str, Any] = field(default_factory=dict)
-    reference_pool: List[UUID4] = field(default_factory=list)
-
-    def new_reference(self, node):
-        query_set = insert(node, self)
-        self.reference_pool.append(query_set.id)
-        return query_set
-
-    def get_tree(self):
-        with tokenize.open(self.path) as stream:
-            source = stream.read()
-
-        if self.fast_mode and len(source) > 80 * 80:
-            return None
-
-        tree = prepare_ast(ast.parse(source))
-        tree.project = self.project
-        tree.filename = self.rel_filename
-        return tree
-
-    @contextmanager
-    def enter_node(self, node):
-        try:
-            self.stack.append(node)
-            yield
-        finally:
-            self.stack.pop()
-
-    @property
-    def flows_from(self):
-        if len(self.stack) >= 1:
-            return self.stack[-1]
-        else:
-            return None
-
-    @cached_property
-    def rel_filename(self):
-        return str(self.path.relative_to(config.data.clean_directory))
-
-    @cached_property
-    def skip(self):
-        return self.rel_filename in FILE_CACHE
 
 
 @singledispatch
@@ -98,7 +31,7 @@ def serialize_project(node, context):
     return IR.select(
         node.kind_name,
         filters=IR.filter(
-            IR.attribute(None, "name"), IR.literal(context.project.name), "="
+            IR.attribute(None, "name"), IR.literal(node.name), "="
         ),
         limit=1,
     )
@@ -111,7 +44,9 @@ def serialize_ast(node, context):
         return IR.enum_member(node.base_name, node.kind_name)
     else:
         # (INSERT ast::BinOp {.left := ..., ...})
-        reference = context.new_reference(node)
+        reference = insert(node, context)
+        context.new_reference(reference.id)
+
         # (SELECT ast::expr FILTER .id = ... LIMIT 1)
         return IR.select(
             node.base_name, filters=IR.object_ref(reference), limit=1
@@ -176,10 +111,10 @@ def insert(node, context):
 
 @guarded
 def insert_file(context):
-    if context.skip:
+    if context.is_cached():
         return Insertion.CACHED
 
-    if not (tree := context.get_tree()):
+    if not (tree := context.as_ast()):
         return Insertion.SKIPPED
 
     with context.connection.transaction():
@@ -205,33 +140,30 @@ def insert_file(context):
                 IR.construct(update), ids=context.reference_pool
             )
 
-    logger.info("%r has been inserted successfully", context.rel_filename)
+    logger.info("%r has been inserted successfully", context.filename)
     return Insertion.INSERTED
 
 
-def insert_project(instance, *, limit=None, fast=False):
-    project = ast.project(
-        instance.name, instance.git_source, instance.git_revision
-    )
+def insert_project(instance, *, global_ctx=None):
+    if global_ctx is None:
+        global_ctx = GlobalContext()
 
-    logger.info(f"{instance.name} insertion lock acquired")
     with get_new_connection() as connection:
-        sync_global_cache(connection)
-        if project.name not in PROJECT_CACHE:
-            project_context = SerializationContext(None, project, connection)
-            insert(project, project_context)
+        project_ctx = global_ctx.new_child(instance, connection)
+        if not project_ctx.is_cached():
+            insert(project_ctx.as_ast(), project_ctx)
+            project_ctx.cache()
 
-        total_inserted = 0
-        project_path = config.data.clean_directory / project.name
-        for file in project_path.glob("**/*.py"):
-            if limit is not None and total_inserted >= limit:
+        statistics = 0
+        for file in project_ctx.path.glob("**/*.py"):
+            if project_ctx.apply_constraints(statistics):
                 break
 
-            file_context = SerializationContext(
-                file, project, connection, fast
-            )
-            if insert_file(file_context) is Insertion.INSERTED:
-                total_inserted += 1
+            file_ctx = project_ctx.new_child(file)
 
-    logger.info(f"{instance.name} insertion lock released")
-    return total_inserted
+            insertion_status = insert_file(file_ctx)
+            if insertion_status is Insertion.INSERTED:
+                statistics += 1
+                file_ctx.cache()
+
+    return statistics

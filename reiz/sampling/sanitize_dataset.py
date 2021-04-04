@@ -70,7 +70,7 @@ def sanitize_dataset(
 
     instances = SamplingData.load(data_file)
     with ProcessPoolExecutor(max_workers=workers) as executor:
-        futures = [
+        tasks = [
             executor.submit(
                 sanitize,
                 instance,
@@ -81,8 +81,8 @@ def sanitize_dataset(
             )
             for instance in instances
         ]
-        for future in futures.as_completed(futures):
-            instance = future.result()
+        for task in futures.as_completed(tasks):
+            instance = task.result()
             if instance is None:
                 continue
 

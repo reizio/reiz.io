@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from concurrent import futures
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from reiz.sampling import SamplingData
@@ -56,13 +56,13 @@ def get_pypi_dataset(data_file, workers=4, limit=500):
     response = json_request(PYPI_DATSET_URL)
     instances = []
 
-    with ProcessPoolExecutor(max_workers=workers) as executor:
-        futures = [
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        tasks = [
             executor.submit(get_sampling_data, **package)
             for package in response["rows"]
         ]
 
-        for future in futures.as_completed(futures):
+        for future in futures.as_completed(tasks):
             instance = future.result()
             if instance is None:
                 continue
@@ -71,9 +71,9 @@ def get_pypi_dataset(data_file, workers=4, limit=500):
             if len(instances) >= limit:
                 break
 
-        for future in futures:
-            if not future.done():
-                future.cancel()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
 
     logger.info(
         "%d repositories have been added to the %s",
