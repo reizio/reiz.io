@@ -3,6 +3,8 @@ import random
 from dataclasses import asdict, dataclass
 from typing import Optional
 
+from reiz.serialization.transformers import ast
+
 
 @dataclass
 class SamplingData:
@@ -34,3 +36,6 @@ class SamplingData:
     @classmethod
     def iter_load(cls, *args, **kwargs):
         return iter(cls.load(*args, **kwargs))
+
+    def as_ast(self):
+        return ast.project(self.name, self.git_source, self.git_revision)

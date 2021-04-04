@@ -10,21 +10,9 @@ from functools import cached_property, singledispatch
 from reiz.config import config
 from reiz.database import DatabaseConnection, get_new_connection
 from reiz.ir import IR, Schema
+from reiz.serialization.cache import Cache
 from reiz.serialization.transformers import iter_properties, prepare_ast
 from reiz.utilities import guarded, logger
-
-FILE_CACHE = frozenset()
-PROJECT_CACHE = frozenset()
-
-
-def sync_global_cache(connection):
-    global FILE_CACHE, PROJECT_CACHE
-
-    query_set = connection.query(IR.query("module.filenames"))
-    FILE_CACHE = frozenset(module.filename for module in query_set)
-
-    query_set = connection.query(IR.query("project.names"))
-    PROJECT_CACHE = frozenset(project.name for project in query_set)
 
 
 class Insertion(Enum):
@@ -78,9 +66,11 @@ class SerializationContext:
     def rel_filename(self):
         return str(self.path.relative_to(config.data.clean_directory))
 
-    @cached_property
-    def skip(self):
-        return self.rel_filename in FILE_CACHE
+    def is_cached(self, cache):
+        return self.rel_filename in cache.files
+
+    def add_cache(self, cache):
+        cache.files.add(self.rel_filename)
 
 
 @singledispatch
@@ -109,7 +99,7 @@ def serialize_ast(node, context):
         return IR.enum_member(node.base_name, node.kind_name)
     else:
         # (INSERT ast::BinOp {.left := ..., ...})
-        reference = insert(node, self)
+        reference = insert(node, context)
         context.new_reference(reference.id)
 
         # (SELECT ast::expr FILTER .id = ... LIMIT 1)
@@ -175,8 +165,8 @@ def insert(node, context):
 
 
 @guarded
-def insert_file(context):
-    if context.skip:
+def insert_file(context, cache):
+    if context.is_cached(cache):
         return Insertion.CACHED
 
     if not (tree := context.get_tree()):
@@ -209,17 +199,18 @@ def insert_file(context):
     return Insertion.INSERTED
 
 
-def insert_project(instance, *, limit=None, fast=False):
-    project = ast.project(
-        instance.name, instance.git_source, instance.git_revision
-    )
+def insert_project(instance, *, cache=None, limit=None, fast=False):
+    project = instance.as_ast()
 
-    logger.info(f"{instance.name} insertion lock acquired")
     with get_new_connection() as connection:
-        sync_global_cache(connection)
-        if project.name not in PROJECT_CACHE:
+        if cache is None:
+            cache = Cache()
+            cache.sync(connection)
+
+        if project.name not in cache.projects:
             project_context = SerializationContext(None, project, connection)
             insert(project, project_context)
+            cache.projects.add(project.name)
 
         total_inserted = 0
         project_path = config.data.clean_directory / project.name
@@ -230,8 +221,8 @@ def insert_project(instance, *, limit=None, fast=False):
             file_context = SerializationContext(
                 file, project, connection, fast
             )
-            if insert_file(file_context) is Insertion.INSERTED:
+            if insert_file(file_context, cache) is Insertion.INSERTED:
                 total_inserted += 1
+                file_context.add_cache(cache)
 
-    logger.info(f"{instance.name} insertion lock released")
     return total_inserted
