@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 from enum import Enum
-from functools import partialmethod, wraps
+from functools import cached_property, partialmethod, wraps
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -93,3 +93,22 @@ def json_request(url):
 def singleton(cls):
     cls.__repr__ = lambda self: type(self).__name__
     return object.__new__(cls)
+
+
+def make_prop(parent, cls, field):
+    def _property(self):
+        return getattr(getattr(self, parent), field)
+
+    prop = cached_property(_property)
+    prop.__set_name__(cls, field)
+    return prop
+
+
+def picker(parent):
+    class CherryPicker:
+        def __init_subclass__(cls, **kwargs):
+            if fields := kwargs.get("inherits"):
+                for field in fields:
+                    setattr(cls, field, make_prop(parent, cls, field))
+
+    return CherryPicker

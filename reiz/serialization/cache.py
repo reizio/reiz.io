@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Set
 
+from reiz.database import get_new_connection
 from reiz.ir import IR
 
 
@@ -8,12 +9,13 @@ from reiz.ir import IR
 class Cache:
     files: Set[str] = field(default_factory=set)
     projects: Set[str] = field(default_factory=set)
-    auto_sync: bool = False
 
-    def __post_init__(self):
-        if self.auto_sync:
-            with get_new_connection() as connection:
-                self.sync(connection)
+    @classmethod
+    def from_db(cls):
+        cache = cls()
+        with get_new_connection() as connection:
+            cache.sync(connection)
+        return cache
 
     def sync(self, connection):
         query_set = connection.query(IR.query("module.filenames"))

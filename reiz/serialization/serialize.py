@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from reiz.sampling import SamplingData
-from reiz.serialization.cache import Cache
+from reiz.serialization.context import GlobalContext
 from reiz.serialization.serializer import insert_project
 from reiz.utilities import logger
 
@@ -18,7 +18,9 @@ def insert_dataset(data_file, clean_directory, workers=2, fast=False):
     instances = SamplingData.load(data_file, random_order=True)
     bound_instances = {}
 
-    cache = Cache(auto_sync=True)
+    global_ctx = GlobalContext(
+        properties={"fast_mode": fast, "max_files": FILE_LIMIT}
+    )
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
 
@@ -30,11 +32,7 @@ def insert_dataset(data_file, clean_directory, workers=2, fast=False):
                 if instance in bound_instances.values():
                     continue
                 task = executor.submit(
-                    insert_project,
-                    instance,
-                    cache=cache,
-                    limit=FILE_LIMIT,
-                    fast=fast,
+                    insert_project, instance, global_ctx=global_ctx
                 )
                 bound_instances[task] = instance
                 tasks.add(task)
