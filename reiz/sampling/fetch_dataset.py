@@ -42,7 +42,7 @@ def checkout_sampling_data(checkout_directory, instance, force):
 @guarded
 def fetch(instances, checkout_directory, workers, force):
     with ProcessPoolExecutor(max_workers=workers) as executor:
-        futures = [
+        tasks = [
             executor.submit(
                 checkout_sampling_data,
                 checkout_directory,
@@ -51,8 +51,8 @@ def fetch(instances, checkout_directory, workers, force):
             )
             for instance in instances
         ]
-        for future in futures.as_completed(futures):
-            instance = future.result()
+        for task in futures.as_completed(tasks):
+            instance = task.result()
             if instance is None:
                 continue
 
