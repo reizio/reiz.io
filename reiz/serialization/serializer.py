@@ -44,10 +44,8 @@ class SerializationContext:
     properties: Dict[str, Any] = field(default_factory=dict)
     reference_pool: List[UUID4] = field(default_factory=list)
 
-    def new_reference(self, node):
-        query_set = insert(node, self)
-        self.reference_pool.append(query_set.id)
-        return query_set
+    def new_reference(self, reference):
+        self.reference_pool.append(reference)
 
     def get_tree(self):
         with tokenize.open(self.path) as stream:
@@ -111,7 +109,9 @@ def serialize_ast(node, context):
         return IR.enum_member(node.base_name, node.kind_name)
     else:
         # (INSERT ast::BinOp {.left := ..., ...})
-        reference = context.new_reference(node)
+        reference = insert(node, self)
+        context.new_reference(reference.id)
+
         # (SELECT ast::expr FILTER .id = ... LIMIT 1)
         return IR.select(
             node.base_name, filters=IR.object_ref(reference), limit=1
