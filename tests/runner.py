@@ -125,7 +125,7 @@ def setup(
     use_same_db=False, change_db_schema=False, start_edgedb_server=False
 ):
     config.database.database = TEST_DATABASE_NAME
-    config.data.clean_directory = TESTING_PATH
+    config.data.path = TESTING_PATH
 
     if start_edgedb_server:
         setup_edgedb_server()

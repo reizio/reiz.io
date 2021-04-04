@@ -66,7 +66,7 @@ class ProjectContext(
 
     @cached_property
     def path(self):
-        return config.data.clean_directory / self.project.name
+        return config.data.path / self.project.name
 
     @cached_property
     def limit(self):
@@ -126,7 +126,7 @@ class FileContext(
 
     @cached_property
     def filename(self):
-        return str(self.file.relative_to(config.data.clean_directory))
+        return str(self.file.relative_to(config.data.path))
 
     @cached_property
     def limit(self):

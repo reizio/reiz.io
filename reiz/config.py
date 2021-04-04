@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+from reiz.utilities import logger
+
 # {
 #     "database": {
 #         "dsn": str,
@@ -13,7 +15,7 @@ from types import SimpleNamespace
 #         "instance": str
 #     },
 #     "data": {
-#         "clean_directory": str
+#         "path": str
 #     },
 #     "web": {
 #         "host": str,
@@ -90,15 +92,13 @@ def process_segment(segment):
     validator.set_if_not_already(segment, "instance")
 
 
-@validator.segment("data", requirements=["clean_directory"])
+@validator.segment("data", requirements=["path"])
 def proccess_segment(segment):
-    validator.cast(segment, "clean_directory", Path)
+    validator.cast(segment, "path", Path)
 
-    segment.clean_directory = segment.clean_directory.expanduser()
-    if not segment.clean_directory.exists():
-        raise ValueError(
-            f"Data directory ({segment.clean_directory!s}) doesn't exist."
-        )
+    segment.path = segment.path.expanduser()
+    if not segment.path.exists():
+        logger.warn("designated data path (%r) doesn't exist", segment.path)
 
 
 @validator.segment("web", requirements=["timeout", "host", "port"])

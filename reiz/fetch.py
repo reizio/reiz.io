@@ -8,7 +8,7 @@ from reiz.ir import IR
 from reiz.reizql import compile_to_ir, parse_query
 
 DEFAULT_LIMIT = 10
-CLEAN_DIRECTORY = config.data.clean_directory
+DATA_PATH = config.data.path
 STATISTICS_NODES = ("Module", "AST", "stmt", "expr")
 
 POSITION_SELECTION = [
@@ -61,7 +61,7 @@ def infer_github_url(result):
 
 
 def fetch(filename, **loc_data):
-    with tokenize.open(CLEAN_DIRECTORY / filename) as file:
+    with tokenize.open(DATA_PATH / filename) as file:
         source = file.read()
 
     loc_node = LocationNode(**loc_data)
