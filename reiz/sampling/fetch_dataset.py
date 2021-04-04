@@ -11,11 +11,11 @@ from reiz.utilities import guarded, logger
 
 
 @guarded
-def checkout_sampling_data(checkout_directory, instance, force):
-    if instance.git_revision and not force:
-        return instance
+def checkout_sampling_data(checkout_directory, project, force):
+    if project.git_revision and not force:
+        return project
 
-    repo_dir = checkout_directory / instance.name
+    repo_dir = checkout_directory / project.name
     if repo_dir.exists():
         shutil.rmtree(repo_dir)
 
@@ -23,8 +23,8 @@ def checkout_sampling_data(checkout_directory, instance, force):
         [
             "git",
             "clone",
-            instance.git_source,
-            instance.name,
+            project.git_source,
+            project.name,
             "--depth",
             "1",
         ],
@@ -33,43 +33,40 @@ def checkout_sampling_data(checkout_directory, instance, force):
         stdout=subprocess.DEVNULL,
         cwd=checkout_directory,
     )
-    instance.git_revision = subprocess.check_output(
+    project.git_revision = subprocess.check_output(
         ["git", "log", "--format='%H'", "-n", "1"], cwd=repo_dir, text=True
     ).strip()[1:-1]
-    return instance
+    return project
 
 
 @guarded
-def fetch(instances, checkout_directory, workers, force):
+def fetch(projects, checkout_directory, workers, force):
     with ProcessPoolExecutor(max_workers=workers) as executor:
         tasks = [
             executor.submit(
                 checkout_sampling_data,
                 checkout_directory,
-                instance,
+                project,
                 force,
             )
-            for instance in instances
+            for project in projects
         ]
         for task in futures.as_completed(tasks):
-            instance = task.result()
-            if instance is None:
-                continue
-
-            logger.info(
-                "%r has been checked at %s revision",
-                instance.name,
-                instance.git_revision,
-            )
-            yield instance
+            if project := task.result():
+                logger.info(
+                    "%r has been checked at %s revision",
+                    project.name,
+                    project.git_revision,
+                )
+            yield project
 
 
 def fetch_dataset(data_file, checkout_directory, force=False, workers=4):
     checkout_directory.mkdir(exist_ok=True)
 
-    instances = SamplingData.load(data_file)
-    instances = list(fetch(instances, checkout_directory, workers, force))
-    SamplingData.dump(data_file, instances)
+    projects = SamplingData.load(data_file)
+    projects = list(fetch(projects, checkout_directory, workers, force))
+    SamplingData.dump(data_file, projects)
 
 
 def main():

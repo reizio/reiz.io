@@ -54,7 +54,7 @@ def get_sampling_data(project, download_count):
 
 def get_pypi_dataset(data_file, workers=4, limit=500):
     response = json_request(PYPI_DATSET_URL)
-    instances = []
+    projects = []
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         tasks = [
@@ -62,13 +62,12 @@ def get_pypi_dataset(data_file, workers=4, limit=500):
             for package in response["rows"]
         ]
 
-        for future in futures.as_completed(tasks):
-            instance = future.result()
-            if instance is None:
-                continue
-            logger.info("Fetched: %s", instance)
-            instances.append(instance)
-            if len(instances) >= limit:
+        for task in futures.as_completed(tasks):
+            if project := task.result():
+                logger.info("Adding %s to the dataset", project.name)
+                projects.append(project)
+
+            if len(projects) >= limit:
                 break
 
         for task in tasks:
@@ -77,10 +76,10 @@ def get_pypi_dataset(data_file, workers=4, limit=500):
 
     logger.info(
         "%d repositories have been added to the %s",
-        len(instances),
+        len(projects),
         str(data_file),
     )
-    SamplingData.dump(data_file, instances)
+    SamplingData.dump(data_file, projects)
 
 
 def main():

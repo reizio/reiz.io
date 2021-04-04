@@ -26,11 +26,11 @@ def source_code(path: Path):
 
 
 @guarded
-def sanitize(instance, raw_directory, clean_directory, force, ignore_tests):
-    src = raw_directory / instance.name
-    dest = clean_directory / instance.name
+def sanitize(project, raw_directory, clean_directory, force, ignore_tests):
+    src = raw_directory / project.name
+    dest = clean_directory / project.name
     if dest.exists() and not force:
-        return instance
+        return project
 
     shutil.copytree(src, dest, dirs_exist_ok=True)
 
@@ -55,7 +55,7 @@ def sanitize(instance, raw_directory, clean_directory, force, ignore_tests):
     subprocess.check_call(
         ["find", ".", "-type", "d", "-empty", "-delete"], cwd=dest
     )
-    return instance
+    return project
 
 
 def sanitize_dataset(
@@ -68,25 +68,22 @@ def sanitize_dataset(
 ):
     clean_directory.mkdir(exist_ok=True)
 
-    instances = SamplingData.load(data_file)
+    projects = SamplingData.load(data_file)
     with ProcessPoolExecutor(max_workers=workers) as executor:
         tasks = [
             executor.submit(
                 sanitize,
-                instance,
+                project,
                 checkout_directory,
                 clean_directory,
                 force,
                 ignore_tests,
             )
-            for instance in instances
+            for project in projects
         ]
         for task in futures.as_completed(tasks):
-            instance = task.result()
-            if instance is None:
-                continue
-
-            logger.info("%r has been sanitized", instance.name)
+            if project := task.result():
+                logger.info("%r has been sanitized", project.name)
 
 
 def main():
