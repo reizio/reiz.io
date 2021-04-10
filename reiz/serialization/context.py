@@ -11,6 +11,7 @@ from reiz.config import config
 from reiz.database import DatabaseConnection
 from reiz.sampling import SamplingData
 from reiz.serialization.cache import Cache
+from reiz.serialization.statistics import Insertion
 from reiz.serialization.transformers import ast, prepare_ast
 from reiz.utilities import picker
 
@@ -62,7 +63,7 @@ class ProjectContext(
         return FileContext(file, self, *args, **kwargs)
 
     def apply_constraints(self, statistics):
-        return statistics >= self.limit
+        return statistics[Insertion.INSERTED] > 10
 
     @cached_property
     def path(self):

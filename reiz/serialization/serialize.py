@@ -8,6 +8,7 @@ from pathlib import Path
 from reiz.sampling import load_dataset
 from reiz.serialization.context import GlobalContext
 from reiz.serialization.serializer import insert_project
+from reiz.serialization.statistics import Insertion
 from reiz.utilities import logger
 
 TASK_LIMIT = 6
@@ -45,8 +46,8 @@ def insert_dataset(data_file, clean_directory, workers=2, fast=False):
             )
             for task in done:
                 instance = bound_instances[task]
-                insertions = task.result()
-                if insertions == 0:
+                stats = task.result()
+                if stats[Insertion.INSERTED] == 0:
                     logger.info(
                         "%r project has been inserted successfully",
                         instance.name,
@@ -58,7 +59,7 @@ def insert_dataset(data_file, clean_directory, workers=2, fast=False):
                     logger.info(
                         "%d files from %r project have been inserted"
                         ", switching to another",
-                        insertions,
+                        stats[Insertion.INSERTED],
                         instance.name,
                     )
 

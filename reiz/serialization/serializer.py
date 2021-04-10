@@ -2,20 +2,14 @@ from __future__ import annotations
 
 import ast
 from dataclasses import field
-from enum import Enum, auto
 from functools import singledispatch
 
 from reiz.database import get_new_connection
 from reiz.ir import IR, Schema
 from reiz.serialization.context import GlobalContext
+from reiz.serialization.statistics import Insertion, Statistics
 from reiz.serialization.transformers import iter_properties
 from reiz.utilities import guarded, logger
-
-
-class Insertion(Enum):
-    CACHED = auto()
-    SKIPPED = auto()
-    INSERTED = auto()
 
 
 @singledispatch
@@ -109,7 +103,7 @@ def insert(node, context):
     return context.connection.query_one(IR.construct(query))
 
 
-@guarded
+@guarded(Insertion.FAILED)
 def insert_file(context):
     if context.is_cached():
         return Insertion.CACHED
@@ -141,29 +135,26 @@ def insert_file(context):
             )
 
     logger.info("%r has been inserted successfully", context.filename)
+    context.cache()
     return Insertion.INSERTED
 
 
-def insert_project(instance, *, global_ctx=None):
+def insert_project(project, *, global_ctx=None):
     if global_ctx is None:
         global_ctx = GlobalContext()
 
     with get_new_connection() as connection:
-        project_ctx = global_ctx.new_child(instance, connection)
+        project_ctx = global_ctx.new_child(project, connection)
         if not project_ctx.is_cached():
             insert(project_ctx.as_ast(), project_ctx)
             project_ctx.cache()
 
-        statistics = 0
+        stats = Statistics()
         for file in project_ctx.path.glob("**/*.py"):
-            if project_ctx.apply_constraints(statistics):
+            if project_ctx.apply_constraints(stats):
                 break
 
             file_ctx = project_ctx.new_child(file)
+            stats[insert_file(file_ctx)] += 1
 
-            insertion_status = insert_file(file_ctx)
-            if insertion_status is Insertion.INSERTED:
-                statistics += 1
-                file_ctx.cache()
-
-    return statistics
+    return stats
