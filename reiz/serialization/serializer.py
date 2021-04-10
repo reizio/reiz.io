@@ -1,15 +1,9 @@
-from __future__ import annotations
-
 import ast
 from dataclasses import field
 from functools import singledispatch
 
-from reiz.database import get_new_connection
 from reiz.ir import IR, Schema
-from reiz.serialization.context import GlobalContext
-from reiz.serialization.statistics import Insertion, Statistics
 from reiz.serialization.transformers import iter_properties
-from reiz.utilities import guarded, logger
 
 
 @singledispatch
@@ -38,7 +32,7 @@ def serialize_ast(node, context):
         return IR.enum_member(node.base_name, node.kind_name)
     else:
         # (INSERT ast::BinOp {.left := ..., ...})
-        reference = insert(node, context)
+        reference = apply_ast(node, context)
         context.new_reference(reference.id)
 
         # (SELECT ast::expr FILTER .id = ... LIMIT 1)
@@ -91,7 +85,7 @@ def serialize_sentinel(value, context):
     return serialize(ast.Sentinel(), context)
 
 
-def insert(node, context):
+def apply_ast(node, context):
     with context.enter_node(node):
         insertions = {
             field: serialize(value, context)
@@ -101,60 +95,3 @@ def insert(node, context):
 
     query = IR.insert(node.kind_name, insertions)
     return context.connection.query_one(IR.construct(query))
-
-
-@guarded(Insertion.FAILED)
-def insert_file(context):
-    if context.is_cached():
-        return Insertion.CACHED
-
-    if not (tree := context.as_ast()):
-        return Insertion.SKIPPED
-
-    with context.connection.transaction():
-        module = insert(tree, context)
-        module_select = IR.select(
-            tree.kind_name, filters=IR.object_ref(module), limit=1
-        )
-
-        update_filter = IR.filter(
-            IR.attribute(None, "id"),
-            IR.call(
-                "array_unpack", [IR.cast("array<uuid>", IR.variable("ids"))]
-            ),
-            "IN",
-        )
-        for base_type in Schema.module_annotated_types:
-            update = IR.update(
-                base_type.kind_name,
-                filters=update_filter,
-                assignments={"_module": module_select},
-            )
-            context.connection.query(
-                IR.construct(update), ids=context.reference_pool
-            )
-
-    logger.info("%r has been inserted successfully", context.filename)
-    context.cache()
-    return Insertion.INSERTED
-
-
-def insert_project(project, *, global_ctx=None):
-    if global_ctx is None:
-        global_ctx = GlobalContext()
-
-    with get_new_connection() as connection:
-        project_ctx = global_ctx.new_child(project, connection)
-        if not project_ctx.is_cached():
-            insert(project_ctx.as_ast(), project_ctx)
-            project_ctx.cache()
-
-        stats = Statistics()
-        for file in project_ctx.path.glob("**/*.py"):
-            if project_ctx.apply_constraints(stats):
-                break
-
-            file_ctx = project_ctx.new_child(file)
-            stats[insert_file(file_ctx)] += 1
-
-    return stats
