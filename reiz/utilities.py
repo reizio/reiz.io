@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 from enum import Enum
-from functools import cached_property, partialmethod, wraps
+from functools import cached_property, partial, partialmethod, wraps
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -43,18 +43,24 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def guarded(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception:
-            logger.exception(
-                "Guarded function %r failed the execution", func.__name__
-            )
-            return None
+def guarded(arg):
+    def make(func, default_value):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception:
+                logger.exception(
+                    "Guarded function %r failed the execution", func.__name__
+                )
+                return None
 
-    return wrapper
+        return wrapper
+
+    if callable(arg):
+        return make(arg, None)
+    else:
+        return partial(make, default_value=arg)
 
 
 class ReizEnum(Enum):

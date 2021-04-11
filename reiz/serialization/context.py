@@ -8,9 +8,11 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from reiz.config import config
+from reiz.database import ConnectionPool as Pool
 from reiz.database import DatabaseConnection
 from reiz.sampling import SamplingData
 from reiz.serialization.cache import Cache
+from reiz.serialization.statistics import Insertion
 from reiz.serialization.transformers import ast, prepare_ast
 from reiz.utilities import picker
 
@@ -40,11 +42,32 @@ class Context:
 
 @dataclass
 class GlobalContext(Context):
-    db_cache: Cache = field(default_factory=Cache.from_db)
+    """Insertion context that holds the primary configuration,
+    the connection pool and the list of already inserted files (cache)"""
+
     properties: Dict[str, Any] = field(default_factory=dict)
+    db_cache: Cache = field(default_factory=Cache)
+    _pool: Pool = field(default_factory=Pool)
+    _is_pool_available: bool = False
+
+    def __enter__(self):
+        self._is_pool_available = True
+        with self._pool.new_connection() as connection:
+            self.db_cache.sync(connection)
+        return self
+
+    def __exit__(self, *args):
+        self._is_pool_available = False
+        self._pool.close()
 
     def new_child(self, project, *args, **kwargs):
         return ProjectContext(project, self, *args, **kwargs)
+
+    @property
+    def pool(self):
+        if not self._is_pool_available:
+            raise ValueError("Can't access database pool out of the context")
+        return self._pool
 
 
 @dataclass
@@ -62,7 +85,7 @@ class ProjectContext(
         return FileContext(file, self, *args, **kwargs)
 
     def apply_constraints(self, statistics):
-        return statistics >= self.limit
+        return statistics[Insertion.INSERTED] > 10
 
     @cached_property
     def path(self):

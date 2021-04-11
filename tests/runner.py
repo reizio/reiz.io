@@ -18,7 +18,7 @@ from reiz.database import get_new_connection
 from reiz.fetch import compile_query, process_queryset
 from reiz.ir import IR
 from reiz.sampling import SamplingData
-from reiz.serialization.serialize import insert_project
+from reiz.serialization.insert import insert_projects
 from reiz.utilities import logger, pprint
 
 REPO_PATH = Path(__file__).parent.parent.resolve()
@@ -118,7 +118,7 @@ def update_db(change_db_schema):
         git_source="https://github.com/reizio/fake_data",
         git_revision="master",
     )
-    insert_project(fake_sampling_data)
+    insert_projects([fake_sampling_data])
 
 
 def setup(

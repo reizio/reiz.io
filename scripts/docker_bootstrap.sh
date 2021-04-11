@@ -18,8 +18,8 @@ post_db () {
     python /app/scripts/create_db.py
 
     # serialize the dataset
-    python -m reiz.serialization.serialize --fast \
-              /app/tmp/dataset.json /app/tmp/data
+    python -m reiz.serialization.insert --fast \
+              /app/tmp/dataset.json
 }
 
 #!/usr/bin/bash
