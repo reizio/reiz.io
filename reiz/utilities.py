@@ -43,12 +43,14 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def guarded(arg):
-    def make(func, default_value):
+def guarded(arg, *, ignored_exceptions=()):
+    def make(func, default_value, ignored_exceptions):
         @wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
+            except ignored_exceptions:
+                return None
             except Exception:
                 logger.exception(
                     "Guarded function %r failed the execution", func.__name__
@@ -58,9 +60,13 @@ def guarded(arg):
         return wrapper
 
     if callable(arg):
-        return make(arg, None)
+        return make(
+            arg, default_value=None, ignored_exceptions=ignored_exceptions
+        )
     else:
-        return partial(make, default_value=arg)
+        return partial(
+            make, default_value=arg, ignored_exceptions=ignored_exceptions
+        )
 
 
 class ReizEnum(Enum):
@@ -118,3 +124,12 @@ def picker(parent):
                     setattr(cls, field, make_prop(parent, cls, field))
 
     return CherryPicker
+
+
+def _available_cores():
+    if affinity := os.sched_getaffinity(0):
+        return len(affinity)
+    elif cpu_count := os.cpu_count():
+        return cpu_count
+    else:
+        return 4

@@ -18,8 +18,8 @@ class Cache:
         return cache
 
     def sync(self, connection):
-        query_set = connection.query(IR.query("module.filenames"))
+        query_set = connection.query(IR.construct_prepared("module.filenames"))
         self.files = {module.filename for module in query_set}
 
-        query_set = connection.query(IR.query("project.names"))
+        query_set = connection.query(IR.construct_prepared("project.names"))
         self.projects = {project.name for project in query_set}
