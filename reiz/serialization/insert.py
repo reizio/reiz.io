@@ -3,6 +3,7 @@ import warnings
 from argparse import ArgumentParser
 from collections import deque
 from concurrent import futures
+from functools import partial
 from pathlib import Path
 
 from reiz.database import InternalDatabaseError
@@ -68,7 +69,7 @@ def insert_project(project, *, global_ctx):
     return stats
 
 
-def _execute_tasks(global_ctx, tasks, projects, populate_tasks):
+def _execute_tasks(tasks, projects, create_tasks, global_ctx):
     global_stats = Statistics()
     while tasks:
         done, _ = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
@@ -84,10 +85,21 @@ def _execute_tasks(global_ctx, tasks, projects, populate_tasks):
         if global_ctx.apply_constraints(global_stats):
             for task in tasks:
                 task.cancel()
-            return global_stats
+            break
 
         projects.rotate(total_completed)
-        tasks.update(populate_tasks(total_completed, tasks.values()))
+        tasks.update(create_tasks(total_completed, tasks.values()))
+    return global_stats
+
+
+def _create_tasks(executor, projects, global_ctx, amount, known_tasks=()):
+    return {
+        executor.submit(
+            insert_project, project, global_ctx=global_ctx
+        ): project
+        for project in itertools.islice(projects, amount)
+        if project not in known_tasks
+    }
 
 
 def insert_projects(projects, *, max_workers=None, global_ctx=None):
@@ -101,21 +113,12 @@ def insert_projects(projects, *, max_workers=None, global_ctx=None):
     )
     with global_ctx:
         with futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-
-            def populate_tasks(amount, known_tasks=()):
-                return {
-                    executor.submit(
-                        insert_project, project, global_ctx=global_ctx
-                    ): project
-                    for project in itertools.islice(projects, amount)
-                    if project not in known_tasks
-                }
-
+            create_tasks = partial(
+                _create_tasks, executor, projects, global_ctx
+            )
+            initial_tasks = create_tasks(max_active_tasks)
             return _execute_tasks(
-                global_ctx,
-                tasks=populate_tasks(max_active_tasks),
-                projects=projects,
-                populate_tasks=populate_tasks,
+                initial_tasks, projects, create_tasks, global_ctx
             )
 
 
