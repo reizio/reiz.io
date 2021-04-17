@@ -25,6 +25,7 @@ repos:
     rev: 0.6.1
     hooks:
     -   id: mdformat
+        exclude: ^paper/
         additional_dependencies:
         - mdformat-black
         args:
