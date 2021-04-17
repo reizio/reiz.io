@@ -106,3 +106,11 @@ FunctionDef(
     type_comment=None,
 )
 ```
+
+## Running Reiz via Docker
+
+Reiz is bundled with a `docker-compose.yml` which can be used to install a demo
+version of reiz (runs on pretty limited dataset). If you'd like to try you can
+run `docker-compose up` and wait a couple minutes (for Reiz to download
+packages, sanitize and serialize them and prepare the IndexDB) and then open
+`http://localhost:8080/` on a browser to see the UI.

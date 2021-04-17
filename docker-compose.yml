@@ -23,3 +23,5 @@ services:
       - ./data:/var/lib/edgedb/data
     environment:
       - EDGEDB_PASSWORD=edgedb
+    logging:
+        driver: none

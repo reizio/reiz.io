@@ -51,6 +51,9 @@ class IRBuilder:
             f"{self.BACKEND_NAME} doesn't support {operation}"
         )
 
+    def add_prepared_query(self, key, node):
+        self.PREPARED_QUERIES[key] = node
+
     def construct(self, node, *, optimize=True, **view_kwargs):
         if optimize:
             optimizer = self.optimizer()
@@ -61,10 +64,7 @@ class IRBuilder:
         printer.view(node, **view_kwargs)
         return printer.construct()
 
-    def add_prepared_query(self, key, node):
-        self.PREPARED_QUERIES[key] = node
-
-    def query(self, key):
+    def construct_prepared(self, key):
         return self.construct(self.PREPARED_QUERIES.get(key))
 
     def new_reference(self, category=None):

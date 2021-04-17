@@ -63,11 +63,18 @@ class GlobalContext(Context):
     def new_child(self, project, *args, **kwargs):
         return ProjectContext(project, self, *args, **kwargs)
 
+    def apply_constraints(self, statistics):
+        return statistics[Insertion.INSERTED] >= self.limit
+
     @property
     def pool(self):
         if not self._is_pool_available:
             raise ValueError("Can't access database pool out of the context")
         return self._pool
+
+    @cached_property
+    def limit(self):
+        return self.properties.get("hard_limit", math.inf)
 
 
 @dataclass
@@ -85,7 +92,7 @@ class ProjectContext(
         return FileContext(file, self, *args, **kwargs)
 
     def apply_constraints(self, statistics):
-        return statistics[Insertion.INSERTED] > 10
+        return statistics[Insertion.INSERTED] >= self.limit
 
     @cached_property
     def path(self):

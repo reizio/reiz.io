@@ -2,10 +2,13 @@ from collections import deque
 from contextlib import ExitStack, closing, contextmanager
 
 import edgedb
+import edgedb.blocking_con
+import edgedb.errors
 
 from reiz.config import config
 
 DatabaseConnection = edgedb.blocking_con.BlockingIOConnection
+InternalDatabaseError = edgedb.errors.InternalServerError
 
 
 def _apply_defaults(kwargs):
