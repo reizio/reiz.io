@@ -7,7 +7,7 @@ from reiz.ir.backends import base
 from reiz.ir.builder import IRBuilder
 from reiz.ir.optimizer import IROptimizer
 from reiz.ir.printer import IRPrinter
-from reiz.schema import EQLSchema
+from reiz.schema import ESDLSchema
 from reiz.utilities import ReizEnum
 
 
@@ -522,7 +522,7 @@ class EQLOptimizer(IROptimizer):
 
 
 class EQLBuilder(IRBuilder, backend_name="EdgeQL"):
-    schema = EQLSchema
+    schema = ESDLSchema
     printer = EQLPrinter
     optimizer = EQLOptimizer
 

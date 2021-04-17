@@ -8,7 +8,7 @@ import pyasdl
 from pyasdl import FieldQualifier
 
 from reiz.schema.builders.base import BaseSchemaGenerator
-from reiz.schema.edgeql import EQLSchema as Schema
+from reiz.schema.esdl import ESDLSchema as Schema
 from reiz.utilities import ReizEnum
 
 INDENT = " " * 4
@@ -109,7 +109,7 @@ class Model:
         return "\n".join(source)
 
 
-class EQLSchemaGenerator(pyasdl.ASDLVisitor, BaseSchemaGenerator):
+class ESDLSchemaGenerator(pyasdl.ASDLVisitor, BaseSchemaGenerator):
 
     TYPE_MAP = {
         "int": "int64",
@@ -218,7 +218,7 @@ def generate_schema(input_file, output_file, schema_file):
             schema[tag] = ast.literal_eval(value)
 
     tree = pyasdl.parse(source)
-    schema_generator = EQLSchemaGenerator(schema)
+    schema_generator = ESDLSchemaGenerator(schema)
     declarations = "\n".join(
         definition.construct() for definition in schema_generator.visit(tree)
     )

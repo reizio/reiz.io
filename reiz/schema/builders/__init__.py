@@ -1,7 +1,7 @@
 from reiz.config import config
-from reiz.schema.builders import base, edgeql
+from reiz.schema.builders import base, esdl
 
-_SCHEMA_GENERATORS = {"edgeql": edgeql.generate_schema}
+_SCHEMA_GENERATORS = {"edgeql": esdl.generate_schema}
 
 
 def get_schema_generator(backend_name):
@@ -11,4 +11,4 @@ def get_schema_generator(backend_name):
         raise base.SchemaError(f"{backend_name!r} backend doesn't exist")
 
 
-generate_schema = _SCHEMA_GENERATORS.get(config.ir.backend)
+generate_schema = get_schema_generator(config.ir.backend)

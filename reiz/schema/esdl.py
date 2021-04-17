@@ -3,7 +3,7 @@ from reiz.utilities import STATIC_DIR, singleton
 
 
 @singleton
-class EQLSchema(BaseSchema):
+class ESDLSchema(BaseSchema):
     NAMESPACE = "ast"
 
     with open(STATIC_DIR / "edgeql" / "keywords.txt") as stream:

@@ -1,2 +1,2 @@
 from reiz.schema.base import BaseSchema
-from reiz.schema.edgeql import EQLSchema
+from reiz.schema.esdl import ESDLSchema
