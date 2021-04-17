@@ -109,7 +109,7 @@ def update_db(change_db_schema):
     assert config.database.database == TEST_DATABASE_NAME
     if change_db_schema:
         drop_and_load_db(
-            REPO_PATH / "static" / "Python-reiz.edgeql", reboot_server=False
+            REPO_PATH / "static" / "Python-reiz.esdl", reboot_server=False
         )
 
     fake_sampling_data = SamplingData(
