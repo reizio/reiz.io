@@ -13,6 +13,44 @@ reizql
 internals
 ```
 
+## Installation via Docker
+
+A local instance of Reiz can be installed through `docker` and `docker-compose`
+without any need to setup anythin else. It will run on a very small dataset (~75
+files from 10 different projects) and will come with a bundled web interface.
+Steps;
+
+Get a fresh reiz clone
+
+```
+$ git clone https://github.com/reizio/reiz.io
+```
+
+Enter the directory and run `docker-compose up`
+
+```
+$ cd reiz.io
+$ docker-compose up --build --remove-orphans
+```
+
+It will take about six to seven minutes for Reiz to initially build necessary
+packages, install requirements, sample some packages for the dataset, prepare
+the database and apply the schema, serialize those packages and finally run the
+API.
+
+```
+reiz_1    | ... is inserted
+reiz_1    | + python -m reiz.web.api
+reiz_1    | [2021-04-24 21:35:38 +0000] [157] [INFO] Goin' Fast @ http://0.0.0.0:8000
+reiz_1    | [2021-04-24 21:35:38,597] _helper         --- Goin' Fast @ http://0.0.0.0:8000
+reiz_1    | [2021-04-24 21:35:38 +0000] [157] [INFO] Starting worker [157]
+reiz_1    | [2021-04-24 21:35:38,929] serve           --- Starting worker [157]
+```
+
+After seeing the `API is running on ...` message, you can open up your browser
+and visit `http://localhost:8080/` which is the web UI (not 8000, unlike the
+API, this uses the port 8080).
+
 ## A gentle introduction
 
 Reiz is the code search framework that reiz.io is built a top on. Due to it's
@@ -106,11 +144,3 @@ FunctionDef(
     type_comment=None,
 )
 ```
-
-## Running Reiz via Docker
-
-Reiz is bundled with a `docker-compose.yml` which can be used to install a demo
-version of reiz (runs on pretty limited dataset). If you'd like to try you can
-run `docker-compose up` and wait a couple minutes (for Reiz to download
-packages, sanitize and serialize them and prepare the IndexDB) and then open
-`http://localhost:8080/` on a browser to see the UI.

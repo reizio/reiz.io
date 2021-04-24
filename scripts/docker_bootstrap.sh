@@ -19,7 +19,7 @@ post_db () {
 
     # serialize the dataset
     python -m reiz.serialization.insert --fast \
-              --limit 56 --project-limit 7 /app/tmp/dataset.json
+              --limit 75 --project-limit 7 /app/tmp/dataset.json
 }
 
 #!/usr/bin/bash
