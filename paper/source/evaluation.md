@@ -6,11 +6,9 @@ evaluate the performance of `Reiz` by running similiar queries in Github Code Se
 grep.app \[@grepapp\] and Krugle \[@krugle\] and report back the amount of true / false positives.
 
 The method of evaluation is running the queries and analyzing the top 10 results. Some engines offer
-multiple matches per result, so for the sake of simplicity we'll count them as true positive if any of
-the matches are actually a true positive. Also the capture areas are ignored, since none of the competitors
-can successfully capture only the individual expression/statement that is being searched.
-
-## Comparisons
+multiple matches per result, and they will be marked as true positive if any of them are a true
+positive. We also discard match spans, since none of the competitors can successfully display the expression
+boundaries.
 
 Objective: search for a `len(...)` call
 
@@ -26,7 +24,6 @@ Objective: search for an addition or a subtraction operation
 | engine               | query                          | true positives | false positives |
 |----------------------|--------------------------------|----------------|-----------------|
 | Github Code Search   | `language:python + -`          | 0              | 0               |
-| Krugle (fuzzy)       | `expr + expr` / `expr - expr`  | 0              | 0               |
 | Krugle (solr syntax) | `\+ \-`                        | 2              | 8               |
 | Krugle (regex syntax)| `(.*)(\+\|\-)(.*)`             | 1              | 9               |
 | grep.app             | `(.*)(\+\|\-)(.*)`             | 2              | 8               |
