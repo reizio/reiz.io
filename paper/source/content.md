@@ -4,54 +4,55 @@ Reiz is a structural source code search engine that can execute queries for
 partially known syntactical constructs inside source code. It allows collection
 and sampling of source code, as well as serialization and comes bundled with a
 DSL called ReizQL which offers the ability to express fragmentary knowledge
-about the construct.
+about the targeted constructs.
 
 # Statement of need
 
 The fact that developers search source code every day is undeniable. This need
 to search has various reasons by different groups of people. When introducing
 new features to a language, developers often need to see what kind of an impact
-that feature will have before actually bothering to implement it (or even
+that those will have before actually bothering to implement it (or even
 discuss it in the first place). Prior to making any changes on a publicly
 facing API, maintainers of those libraries do the pre-requisite work of
 collecting samples and estimating the ramifications that operation might cause.
 When the documentation of a framework doesn't sustain the curiosity, searching
 for a structure (e.g a function, a constant) to see how it can be utilized in
-real-world software is a common need among developers.
+real-world software is a common need among developers \[@developersearch2017\].
 
-While searching for a particular source code structure, it is almost impossible
-to describe syntactical patterns on a search engine where the code is behaved
-no different than a stream of characters/tokens. Even on the providers where
-they support regular expressions, identifying nested syntactical structures or
-leaving room for some ambiguity is quite problematic.
+While searching for a particular structure inside source code, it is almost
+impossible to describe structural patterns on a search engine where the code
+has behaved no different than a stream of characters/tokens. Even on the
+providers where they support regular expressions, identifying nested
+syntactical structures or leaving room for some ambiguity is quite problematic.
 
 # State of the field
 
-Popular source code search engines (like
-[GitHub code search](https://github.com/search)) uses full-text search where
-the code is behaved not much different than a regular textual document. Even
-though this approach works for some basic queries, structurally it can't go
-further than matching token sequences. This often causes seeing irrelevant
-search results on complex queries, or even not being able to express the search
-itself in a purely textual form. In the past, there has been some work done
-regarding making queries more expressive through regular expressions (one
-example might codesearch.debian.net \[@debiancodesearch\]), and even annotating
-the result set with some semantical and structural knowledge (via finding and
-resolving API names \[@BAJRACHARYA2014241\]).
+Popular source code search engines (e.g Github Code Search
+\[@githubcodesearch\]) uses full-text search where the code is behaved not much
+different than a regular textual document. Even though this approach works for
+some basic queries, structurally it can't go further than matching token
+sequences. This often causes seeing irrelevant search results on complex
+queries, or even not being able to express the search itself in a purely
+textual form. In the past, there has been some work done regarding making
+queries more expressive through regular expressions (one example might
+codesearch.debian.net \[@debiancodesearch\]), and even annotating the result
+set with some semantical and structural knowledge (via finding and resolving
+API names \[@BAJRACHARYA2014241\]).
 
 # Method
 
 ![Stages from the Reiz's pipeline.](internals.png)
 
 The internals consists of a pipeline that enables the ability to plug in and
-out different components, such as frontends for different languages. The
+out different components, such as for frontends of different languages. The
 primary piece that every other component directly or indirectly interacts with
 is the Index DB (a.k.a source warehouse) where the serialized AASTs (Annotated
-Abstract Syntax Trees) are being held. It consists of a relational database,
-which by default is EdgeDB (can be customized). The schema used in the Index DB
-is in the format of ESDL (EdgeDB Schema Definition Language) and automatically
-generated from the host language's ASDL \[@asdl97\] declaration. It is a
-common format used by many different projects, most notably CPython itself.
+Abstract Syntax Trees) are being held. It is based on an EdgeDB \[@edgedb\]
+instance which interprets the compiled queries and returns the raw result set.
+The schema used in the Index DB is in the format of ESDL (EdgeDB Schema
+Definition Language) and automatically generated from the host language's ASDL
+\[@asdl97\] declaration. It is a common format used by many different projects,
+most notably by CPython itself.
 
 ## Sampling Source Code
 
