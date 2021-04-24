@@ -12,11 +12,12 @@ from reiz.database import ConnectionPool as Pool
 from reiz.database import DatabaseConnection
 from reiz.sampling import SamplingData
 from reiz.serialization.cache import Cache
-from reiz.serialization.statistics import Insertion
+from reiz.serialization.statistics import Insertion, Statistics
 from reiz.serialization.transformers import ast, prepare_ast
-from reiz.utilities import picker
+from reiz.utilities import ProgressMixin, apply_defaults, picker
 
 _AVG_CHARS = 80 * 80
+_DEFAULTS = {"hard_limit": 300, "max_files": 10, "fast_mode": False}
 
 
 class Context:
@@ -29,6 +30,9 @@ class Context:
     def apply_constraints(self, statistics):
         raise NotImplementedError
 
+    def progress(self, disable=False):
+        raise NotImplementedError
+
     @contextmanager
     def enter_node(self, node):
         yield
@@ -39,9 +43,13 @@ class Context:
     def is_cached(self):
         return False
 
+    @cached_property
+    def stats(self):
+        return Statistics()
+
 
 @dataclass
-class GlobalContext(Context):
+class GlobalContext(Context, ProgressMixin):
     """Insertion context that holds the primary configuration,
     the connection pool and the list of already inserted files (cache)"""
 
@@ -49,6 +57,9 @@ class GlobalContext(Context):
     db_cache: Cache = field(default_factory=Cache)
     _pool: Pool = field(default_factory=Pool)
     _is_pool_available: bool = False
+
+    def __post_init__(self):
+        apply_defaults(self.properties, _DEFAULTS)
 
     def __enter__(self):
         self._is_pool_available = True
@@ -66,6 +77,13 @@ class GlobalContext(Context):
     def apply_constraints(self, statistics):
         return statistics[Insertion.INSERTED] >= self.limit
 
+    def progress(self, disable=False):
+        return self.set_bar(
+            total=self.limit,
+            unit="file",
+            desc="Serializing files to the IndexDB",
+        )
+
     @property
     def pool(self):
         if not self._is_pool_available:
@@ -74,7 +92,7 @@ class GlobalContext(Context):
 
     @cached_property
     def limit(self):
-        return self.properties.get("hard_limit", math.inf)
+        return self.properties["hard_limit"]
 
 
 @dataclass
@@ -100,7 +118,16 @@ class ProjectContext(
 
     @cached_property
     def limit(self):
-        return self.properties.get("max_files", math.inf)
+        return self.properties["max_files"]
+
+    @cached_property
+    def stats(self):
+        statistics = Statistics()
+        if self.global_ctx.bar:
+            statistics.add_callback(
+                Insertion.INSERTED, self.global_ctx.bar.move
+            )
+        return statistics
 
     def cache(self):
         self.db_cache.projects.add(self.project.name)
@@ -160,7 +187,7 @@ class FileContext(
 
     @cached_property
     def limit(self):
-        if self.properties.get("fast_mode"):
+        if self.properties["fast_mode"]:
             return _AVG_CHARS
         else:
             return math.inf

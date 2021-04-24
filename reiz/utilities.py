@@ -2,10 +2,13 @@ import json
 import logging
 import os
 import sys
+from contextlib import contextmanager
 from enum import Enum
 from functools import cached_property, partial, partialmethod, wraps
 from pathlib import Path
 from urllib.request import urlopen
+
+from tqdm import tqdm
 
 try:
     import black
@@ -134,3 +137,35 @@ def _available_cores():
         return cpu_count
     else:
         return 4
+
+
+def apply_defaults(original, defaults):
+    for key, value in defaults.items():
+        if original.get(key) is None:
+            original[key] = value
+
+
+class ProgressBar(tqdm):
+    def move(self, _):
+        self.update()
+
+
+class ProgressMixin:
+    def _initalize(self):
+        if not hasattr(self, "_pbar_stack"):
+            self._pbar_stack = []
+
+    @contextmanager
+    def set_bar(self, *args, **kwargs):
+        self._initalize()
+        self._pbar_stack.append(ProgressBar(*args, **kwargs))
+        yield self.bar
+        self._pbar_stack.pop().close()
+
+    @property
+    def bar(self):
+        self._initalize()
+        if self._pbar_stack:
+            return self._pbar_stack[-1]
+        else:
+            return None

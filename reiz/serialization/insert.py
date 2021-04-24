@@ -6,16 +6,19 @@ from concurrent import futures
 from functools import partial
 from pathlib import Path
 
-from reiz.database import InternalDatabaseError
+from reiz.database import ConstraintViolationError, InternalDatabaseError
 from reiz.ir import IR, Schema
 from reiz.sampling import load_dataset
 from reiz.serialization.context import GlobalContext
 from reiz.serialization.serializer import apply_ast
-from reiz.serialization.statistics import Insertion, Statistics
-from reiz.utilities import _available_cores, guarded, logger
+from reiz.serialization.statistics import Insertion
+from reiz.utilities import _available_cores, guarded
 
 
-@guarded(Insertion.FAILED, ignored_exceptions=(InternalDatabaseError,))
+@guarded(
+    Insertion.FAILED,
+    ignored_exceptions=(InternalDatabaseError, ConstraintViolationError),
+)
 def insert_file(context):
     if context.is_cached():
         return Insertion.CACHED
@@ -46,7 +49,6 @@ def insert_file(context):
                 IR.construct(update), ids=context.reference_pool
             )
 
-    logger.info("%r has been inserted successfully", context.filename)
     context.cache()
     return Insertion.INSERTED
 
@@ -58,19 +60,19 @@ def insert_project(project, *, global_ctx):
             apply_ast(project_ctx.as_ast(), project_ctx)
             project_ctx.cache()
 
-        stats = Statistics()
+        project_stats = project_ctx.stats
         for file in project_ctx.path.glob("**/*.py"):
-            if project_ctx.apply_constraints(stats):
+            if project_ctx.apply_constraints(project_stats):
                 break
 
             file_ctx = project_ctx.new_child(file)
-            stats[insert_file(file_ctx)] += 1
+            project_stats[insert_file(file_ctx)] += 1
 
-    return stats
+    return project_stats
 
 
 def _execute_tasks(tasks, projects, create_tasks, global_ctx):
-    global_stats = Statistics()
+    global_stats = global_ctx.stats
     while tasks:
         done, _ = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
         total_completed = len(done)
@@ -80,7 +82,6 @@ def _execute_tasks(tasks, projects, create_tasks, global_ctx):
             global_stats.update(stats)
             if stats[Insertion.INSERTED] == 0:
                 projects.remove(project)
-            logger.info("%s: %r", project.name, stats)
 
         if global_ctx.apply_constraints(global_stats):
             for task in tasks:
@@ -102,24 +103,25 @@ def _create_tasks(executor, projects, global_ctx, amount, known_tasks=()):
     }
 
 
-def insert_projects(projects, *, max_workers=None, global_ctx=None):
+def insert_projects(
+    projects, *, max_workers=None, global_ctx=None, no_progress_bar=False
+):
     if global_ctx is None:
         global_ctx = GlobalContext()
 
     projects = deque(projects)
     max_workers = max_workers or (_available_cores() // 2) + 1
-    max_active_tasks = (
-        global_ctx.properties.get("max_files", 10) // max_workers
-    )
+    max_active_tasks = global_ctx.properties["max_files"] // max_workers
     with global_ctx:
         with futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             create_tasks = partial(
                 _create_tasks, executor, projects, global_ctx
             )
             initial_tasks = create_tasks(max_active_tasks)
-            return _execute_tasks(
-                initial_tasks, projects, create_tasks, global_ctx
-            )
+            with global_ctx.progress(disable=no_progress_bar):
+                return _execute_tasks(
+                    initial_tasks, projects, create_tasks, global_ctx
+                )
 
 
 def insert_dataset(dataset_path, max_workers=None, **options):
@@ -136,9 +138,7 @@ def main():
     parser.add_argument("-w", "--workers", default=None, type=int)
     parser.add_argument("--fast", action="store_true", dest="fast_mode")
     parser.add_argument("--limit", type=int, dest="hard_limit")
-    parser.add_argument(
-        "--project-limit", type=int, dest="max_files", default=10
-    )
+    parser.add_argument("--project-limit", type=int, dest="max_files")
     options = parser.parse_args()
 
     with warnings.catch_warnings():

@@ -3,12 +3,12 @@ from contextlib import ExitStack, closing, contextmanager
 
 import edgedb
 import edgedb.blocking_con
-import edgedb.errors
+from edgedb.errors import ConstraintViolationError
+from edgedb.errors import InternalServerError as InternalDatabaseError
 
 from reiz.config import config
 
 DatabaseConnection = edgedb.blocking_con.BlockingIOConnection
-InternalDatabaseError = edgedb.errors.InternalServerError
 
 
 def _apply_defaults(kwargs):
