@@ -2,13 +2,12 @@ import json
 import logging
 import os
 import sys
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
+from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property, partial, partialmethod, wraps
 from pathlib import Path
 from urllib.request import urlopen
-
-from tqdm import tqdm
 
 try:
     import black
@@ -145,7 +144,40 @@ def apply_defaults(original, defaults):
             original[key] = value
 
 
-class ProgressBar(tqdm):
+@dataclass
+class BaseProgressBar:
+    desc: str
+    unit: str
+    total: int
+
+    _counter: int = 0
+
+    def __post_init__(self):
+        self.display()
+
+    def display(self):
+        logging.info(
+            "%s: %d / %d %ss",
+            self.desc,
+            self._counter,
+            self.total,
+            self.unit,
+        )
+
+    def update(self, n=1):
+        self._counter += n
+        self.display()
+
+
+try:
+    import tqdm
+except ImportError:
+    pass
+else:
+    BaseProgressBar = tqdm.tqdm
+
+
+class ProgressBar(tqdm.tqdm):
     def move(self, _):
         self.update()
 

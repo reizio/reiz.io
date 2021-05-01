@@ -1,7 +1,6 @@
 pyasdl
 edgedb
 aioredis
-tqdm
 black==20.8b1
 # web
 sanic
