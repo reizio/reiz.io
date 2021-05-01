@@ -36,11 +36,10 @@ When the documentation of a framework doesn't sustain the curiosity, searching
 for a structure (e.g a function, a constant) to see how it can be utilized in
 real-world software is a common need among developers \[@developersearch2017\].
 
-While searching for a particular structure inside source code, it is almost
-impossible to describe structural patterns on a search engine where the code
-has behaved no different than a stream of characters/tokens. Even on the
-providers where they support regular expressions, identifying nested
-syntactical structures or leaving room for some ambiguity is quite problematic.
+For the problems mentioned above, we present Reiz. A new search engine that can
+interpret partially-expressive ReizQL queries to describe structural patterns
+on source code by leveraging syntax trees and various other aspects of the
+input in a scalable and practical way.
 
 # State of the field
 
