@@ -283,6 +283,7 @@ def main(argv=None):
     parser.add_argument("--start-edgedb-server", action="store_true")
     parser.add_argument("--do-not-fail", action="store_true")
     parser.add_argument("--allow-fail", nargs="+", default=frozenset())
+    parser.add_argument("--benchmark-iterations", default=3, type=int)
     options = parser.parse_args(argv)
 
     setup(
@@ -293,7 +294,7 @@ def main(argv=None):
 
     fail = run_tests(options.allow_fail)
     if options.run_benchmarks and not fail:
-        run_benchmarks()
+        run_benchmarks(options.benchmark_iterations)
     if EDB_PROCESS is not None:
         EDB_PROCESS.terminate()
 
