@@ -7,6 +7,7 @@ import sys
 import time
 import tokenize
 from argparse import ArgumentParser
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Set
@@ -19,7 +20,7 @@ from reiz.fetch import compile_query, process_queryset
 from reiz.ir import IR
 from reiz.sampling import SamplingData
 from reiz.serialization.insert import insert_projects
-from reiz.utilities import logger, pprint
+from reiz.utilities import logger
 
 REPO_PATH = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, REPO_PATH)
@@ -266,13 +267,21 @@ def run_tests(allow_fail):
     return fail
 
 
-def run_benchmarks(times=3):
+def run_benchmarks(iterations, results_file=None):
+    if results_file:
+        file = open(results_file, "w")
+    else:
+        file = nullcontext(sys.stdout)
+
     with get_new_connection() as connection:
         benchmarks = {
-            test_case.name: test_case.run_benchmarks(connection, times=times)
+            test_case.name: test_case.run_benchmarks(
+                connection, times=iterations
+            )
             for test_case in collect_tests(log_skip=False)
         }
-        pprint(benchmarks)
+        with file as stream:
+            json.dump(benchmarks, stream, indent=4)
 
 
 def main(argv=None):
@@ -284,6 +293,7 @@ def main(argv=None):
     parser.add_argument("--do-not-fail", action="store_true")
     parser.add_argument("--allow-fail", nargs="+", default=frozenset())
     parser.add_argument("--benchmark-iterations", default=3, type=int)
+    parser.add_argument("--benchmark-results-file")
     options = parser.parse_args(argv)
 
     setup(
@@ -294,7 +304,9 @@ def main(argv=None):
 
     fail = run_tests(options.allow_fail)
     if options.run_benchmarks and not fail:
-        run_benchmarks(options.benchmark_iterations)
+        run_benchmarks(
+            options.benchmark_iterations, options.benchmark_results_file
+        )
     if EDB_PROCESS is not None:
         EDB_PROCESS.terminate()
 
