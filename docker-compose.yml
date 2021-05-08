@@ -16,7 +16,7 @@ services:
     depends_on:
       - "reiz"
   edgedb:
-    image: edgedb/edgedb:20210320022940b2b91d
+    image: edgedb/edgedb:1-beta2
     ports:
       - "5656:5656"
     volumes:
