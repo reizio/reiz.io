@@ -128,7 +128,8 @@ def picker(parent):
 
 
 def _available_cores():
-    if affinity := os.sched_getaffinity(0):
+    get_affinity = getattr(os, "sched_getaffinity", None)
+    if get_affinity and (affinity := get_affinity(0)):
         return len(affinity)
     elif cpu_count := os.cpu_count():
         return cpu_count
