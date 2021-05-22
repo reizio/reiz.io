@@ -58,7 +58,7 @@ def fetch(projects, checkout_directory, workers, force):
                     project.name,
                     project.git_revision,
                 )
-            yield project
+                yield project
 
 
 def fetch_dataset(data_file, checkout_directory, force=False, workers=4):
