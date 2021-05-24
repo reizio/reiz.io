@@ -108,9 +108,7 @@ def insert_projects(projects, *, max_workers=None, global_ctx=None):
 
     projects = deque(projects)
     max_workers = max_workers or (_available_cores() // 2) + 1
-    max_active_tasks = (
-        global_ctx.properties.get("max_files", 10) // max_workers
-    )
+    max_active_tasks = global_ctx.properties.get("max_files", 10) * max_workers
     with global_ctx:
         with futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             create_tasks = partial(
