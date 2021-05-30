@@ -1,4 +1,4 @@
-version: "3.8"
+version: "2.4"
 services:
   reiz:
     build: .
@@ -8,13 +8,6 @@ services:
       - .:/app
     depends_on:
       - "edgedb"
-  web:
-    build:
-        context: static/ui/
-    ports:
-      - "8080:8080"
-    depends_on:
-      - "reiz"
   edgedb:
     image: edgedb/edgedb:1-beta2
     ports:

@@ -1,10 +1,11 @@
 import json
 import traceback
 from dataclasses import asdict
+from pathlib import Path
 
 import aioredis
 from edgedb.errors import InvalidReferenceError
-from sanic import Sanic
+from sanic import Sanic, response
 from sanic.response import json as json_response
 from sanic_cors import CORS
 from sanic_limiter import Limiter, get_remote_address
@@ -25,6 +26,9 @@ app.config["KEEP_ALIVE_TIMEOUT"] = 120
 
 limiter = Limiter(app, key_func=get_remote_address)
 CORS(app)
+
+WORKSPACE = Path(__file__).parent.resolve()
+STATIC_DIR = WORKSPACE / "static"
 
 
 @app.listener("before_server_start")
@@ -57,6 +61,11 @@ async def set_cache(key, value):
         return None
 
     await app.redis_pool.set(json.dumps(key), json.dumps(value))
+
+
+@app.route("/")
+async def index(request):
+    return await response.file(STATIC_DIR / "index.html")
 
 
 @app.route("/query", methods=["POST"])

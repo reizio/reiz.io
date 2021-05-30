@@ -47,9 +47,8 @@ reiz_1    | [2021-04-24 21:35:38 +0000] [157] [INFO] Starting worker [157]
 reiz_1    | [2021-04-24 21:35:38,929] serve           --- Starting worker [157]
 ```
 
-After seeing the `API is running on ...` message, you can open up your browser
-and visit `http://localhost:8080/` which is the web UI (not 8000, unlike the
-API, this uses the port 8080).
+After seeing the `Goin' Fast @ ...` message, you can open up your browser and
+visit `http://localhost:8000/` and be greeted by the web UI.
 
 ## A gentle introduction
 

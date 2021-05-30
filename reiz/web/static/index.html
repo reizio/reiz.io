@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Local Reiz Instance</title>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="initial-scale=1,width=device=width"/>
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.2/css/all.min.css"/>
+		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.2/styles/default.min.css"/>
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css" />
+		<style>
+			@import url(https://fonts.googleapis.com/css?family=Open+Sans);
+
+			* {
+				margin: 0px;
+				padding: 0px;
+				outline: none;
+				text-decoration: none;
+			}
+
+			html, body {
+				margin: 0 auto;
+				max-width: 650px;
+				font-family: 'Open Sans';
+			}
+
+			.center {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				text-align: center;
+			}
+
+			h1 {
+				padding: 30px 0px;
+				text-transform: uppercase;
+				color: purple;
+			}
+
+			#docs {
+				padding-bottom: 30px;
+			}
+
+			#search-container {
+				display: grid;
+				grid-template-columns: auto 30px;
+				padding: 10px;
+				width: 100%;
+				border: 1px solid purple;
+				border-radius: 5px;
+				font-size: 10px;
+			}
+
+			#search {
+				font-family: monospace;
+				border: 0px;
+			}
+
+			#search-button {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				border: 0px;
+				background: transparent;
+			}
+
+			#inspect {
+				display: flex;
+				align-items: center;
+				grid-gap: 20px;
+				margin-bottom: 20px;
+				padding: 10px;
+			}
+
+			#search-history {
+				margin: 16px 0 0 0;
+				padding-bottom: 50px;
+				width: 100%;
+				list-style-type: none;
+			}
+
+			#search-history:hover li {
+				opacity: .5;
+			}
+
+			#search-history li {
+				color: purple;
+				font-size: 16px;
+				margin-bottom: 8px;
+				padding: 12px 24px;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				position: relative;
+				transition: all .3s ease-in-out;
+				border-radius: 8px;
+			}
+
+			#search-history li:hover {
+				opacity: 1;
+			}
+
+			#search-history li span.text {
+				position: relative;
+				z-index: 3;
+			}
+
+			#search-history li span.text a {
+				text-decoration: none;
+			}
+
+			#search-history li a.link {
+				width: 100%;
+				height: 40px;
+				display: block;
+				position: absolute;
+				z-index: 2;
+				left: 0;
+			}
+
+			#search-history li:before {
+				content: '\f1da';
+				font-family: 'Font Awesome\ 5 Free';
+				font-weight: 900;
+				margin-right: 12px;
+				transition: all .3s ease-in-out;
+			}
+
+			#search-history li:after {
+				content: '\f30b';
+				opacity: 0;
+				position: absolute;
+				right: 16px;
+				font-family: 'Font Awesome\ 5 Free';
+				font-weight: 900;
+				margin-right: 12px;
+				transition: all .3s ease-in-out;
+			}
+
+			#search-history li:hover {
+				background: rgba(128, 0, 128, .25);
+			}
+
+			#search-history li:hover:after {
+				opacity: 1;
+			}
+
+			#next-button {
+				margin: 50px 0px;
+				padding: 10px;
+				width: 100%;
+				text-align: center;
+				background: purple;
+				color: white;
+				border: 0px;
+				border-radius: 5px;
+			}
+
+			#results {
+				padding-bottom: 60px;
+			}
+
+			#loading {
+				width: 100px;
+				animation-name: spinning;
+				animation-duration: 3s;
+				animation-iteration-count: infinite;
+			}
+
+			#error {
+				text-align: center;
+				color: red;
+			}
+
+			@keyframes spinning {
+				0% { transform: rotate(0deg) }
+				100% { transform: rotate(-360deg) }
+			}
+
+			code {
+				font-family: monospace;
+				font-size: 16px;
+			}
+
+		</style>
+	</head>
+
+	<body>
+
+		<!-- FORK ME -->
+		<a class="github-fork-ribbon" href="https://github.com/reizio/reiz.io" data-ribbon="Fork me on GitHub" title="Fork me on GitHub">
+			Fork me on GitHub
+		</a>
+
+		<div class="center">
+			<a href="/">
+				<h1>search.tree.science</h1>
+			</a>
+
+			<!-- SEARCH -->
+			<div id="search-container">
+				<input id="search" placeholder="Query..." onchange="fetchQuery()">
+				<button id="search-button" onclick="fetchQuery()">
+					<i class="fa fa-search"></i>
+				</button>
+			</div>
+
+			<div id="inspect">
+				<a href="https://reizio.readthedocs.io/en/latest/reizql.html"><h3>ReizQL docs</h3></a>
+			</div>
+		</div>
+
+
+		<ul id="search-history"></ul>
+
+		<!-- QUERY RESULTS -->
+		<div id="results"></div>
+
+		<!-- LIBS -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.2/highlight.min.js"></script>
+		<script>
+			// DOM REFERENCES
+			window.search = document.getElementById('search')
+			const app = document.getElementById('app')
+			const searchHistory = document.getElementById('search-history')
+
+
+			// STATE
+			window.state = {
+				offset: 0,
+				results: [],
+				loading: false,
+				error: null,
+				history: [
+					'Call(Name("len"))',
+					'BinOp(op=Add() | Sub())',
+					'Return(Tuple())',
+					'FunctionDef(f"run_%")',
+					'Tuple([Constant(), Constant()])',
+					'FunctionDef(body=[*..., Return(Call())])',
+				],
+				urlParams: new URLSearchParams(window.location.search)
+			};
+
+			function setState(data) {
+				window.state = {...window.state, ...data}
+
+				window.state.urlParams.set('query', window.search.value)
+				window.state.urlParams.set('offset', window.state.offset)
+				window.history.pushState({
+					query: window.search.value,
+					offset: window.state.offset
+				}, '', '/?' + window.state.urlParams.toString())
+
+				render()
+			}
+
+
+			// COMPONENTS
+			async function render() {
+				const noResultsFound = state.results.length === 0
+									&& state.history.length === 0
+									&& state.loading === false
+									&& state.error === null
+
+				results.innerHTML = `
+					${state.results.map(CodeComponent).join('')}
+					${state.results.length === 10 ? `<button id="next-button" onclick="nextPage()">Next</button>` : ''}
+					${noResultsFound ? `<p style="text-align: center">No Results Found...</p>` : ''}
+					${state.loading ? '<p align="center"><img id="loading" src="https://user-images.githubusercontent.com/47358913/120297974-4dda3980-c2d2-11eb-8112-858c69cbf94a.png"/></p>' : '' }
+					${state.error ? `<p id="error">${state.error}</p>` : '' }
+				`
+
+				searchHistory.innerHTML = state.history.map(HistoryComponent).join('')
+
+				document.querySelectorAll(".hljs").forEach(hljs.highlightBlock)
+			}
+
+			function CodeComponent({ repo, username, github_link, filename, source }) {
+				return `
+					<fieldset>
+						<legend>
+							<a href=${repo}>
+								<img src="https://avatars.githubusercontent.com/${username}" width=40 height=40/>
+							</a>
+							<a href="${github_link}">
+								${filename}
+							</a>
+						</legend>
+						<pre style="max-width: 650px; overflow-x: auto">
+							<code class="python hljs">${source}</code>
+						</pre>
+					</fieldset>
+				`
+			}
+
+			function HistoryComponent(data) {
+				return `
+					<li onclick="(search.value = this.innerText) && (window.state.history = []) && fetchQuery()">
+						<span class="text"><a>${data}</a></span>
+					</li>
+				`
+			}
+
+
+			// EVENT HANDLERS
+			async function fetchQuery() {
+				setState({ results: [], loading: true })
+
+				const response = await fetch(`/query`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						query: search.value,
+						offset: window.state.offset
+					})
+				});
+
+				const {results, exception} = await response.json();
+				setState({
+					results,
+					error: exception,
+					loading: false,
+					history: []
+				})
+			}
+
+			function nextPage() {
+				window.state.offset += window.state.results.length;
+				window.scrollTo(0, 0)
+				fetchQuery()
+			}
+
+
+			// entry point
+			(async function () {
+				const [query, offset] = [
+					window.state.urlParams.get('query'),
+					+window.state.urlParams.get('offset') || 0
+				]
+
+				if (query) {
+					window.search.value = query
+					setState({ offset, history: [] })
+					fetchQuery().then(render)
+				} else {
+					render()
+				}
+			})()
+
+		</script>
+	</body>
+</html>
