@@ -74,7 +74,7 @@ class GlobalContext(Context):
 
     @cached_property
     def limit(self):
-        return self.properties.get("hard_limit", math.inf)
+        return self.properties.get("hard_limit") or math.inf
 
 
 @dataclass
@@ -100,7 +100,7 @@ class ProjectContext(
 
     @cached_property
     def limit(self):
-        return self.properties.get("max_files", math.inf)
+        return self.properties.get("max_files") or math.inf
 
     def cache(self):
         self.db_cache.projects.add(self.project.name)
