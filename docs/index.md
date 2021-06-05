@@ -11,6 +11,7 @@ knowledge (no semantics applied).
 
 reizql
 internals
+contributing
 ```
 
 ## Installation via Docker
