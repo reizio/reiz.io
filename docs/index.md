@@ -12,6 +12,7 @@ knowledge (no semantics applied).
 reizql
 internals
 contributing
+installation-to-aws
 ```
 
 ## Installation via Docker
