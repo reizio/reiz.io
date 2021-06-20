@@ -1,10 +1,8 @@
 # Summary
 
-Reiz is a structural source code search engine that can execute queries for
-partially known syntactical constructs inside source code. It allows collection
-and sampling of source code, as well as serialization and comes bundled with a
-DSL called ReizQL which offers the ability to express fragmentary knowledge
-about the targeted constructs.
+Reiz is a structural source code search engine that can execute queries written
+in ReizQL to retrieve partially known syntactical constructs inside a
+pre-processed source index.
 
 # Statement of need
 
@@ -19,10 +17,10 @@ When the documentation of a framework doesn't sustain the curiosity, searching
 for a structure (e.g a function, a constant) to see how it can be utilized in
 real-world software is a common need among developers \[@developersearch2017\].
 
-For the problems mentioned above, we present Reiz. A new search engine that can
-interpret partially-expressive ReizQL queries to describe structural patterns
-on source code by leveraging syntax trees and various other aspects of the
-input in a scalable and practical way.
+For the problems mentioned above, we present Reiz. A source code search engine
+backend that can exercise queries to match syntax trees in order to leverage
+the existing language syntax to describe partial knowledge (e.g a searching for
+a `try`/ `finally` construct without knowing what is under the `try` block).
 
 # State of the field
 
@@ -108,8 +106,36 @@ NAME                    ::= "a".."Z"
 NUMBER                  ::= INTEGER | FLOAT
 ```
 
-ReizQL is a declarative pattern matching language designed specifically for
-ASTs. It offers an extensive ability to match both full and partial syntax
-trees and retrieve the results as raw source code. Besides matching trees, it
-also allows a limited metadata search (filenames, project names etc) and
-finding alike strings.
+The grammar above describes the ReizQL language which is embedded into the
+execution engine. It can be used as is, or can be selected as a compilation
+target for a higher level language that is more integrated with the syntax of
+the host language.
+
+Following query will search for all occurrences of a for loop, where the
+target's `result` method is called subsequently in the loop body. The `target`
+is an example of the reference pattern, which has a query-bound value (e.g if
+the first `~target` capture is `X`, then the following capture is also expected
+to be the same).
+
+```
+For(
+    target=~target,
+    body=[
+        Expr(
+            value=Call(
+                func=Attribute(value=~target, attr="result")
+            )
+        )
+    ],
+)
+```
+
+The query in the example can be automatically generated through various forms,
+as well as as can be hand written. For example, IRun project targets ReizQL
+with a python superset form to be a more human friendly interface to the
+engine;
+
+```
+for $target in ...:
+    $target.result()
+```

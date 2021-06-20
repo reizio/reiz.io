@@ -1,5 +1,5 @@
 ---
-title: 'Reiz: Structural Source Code Search at Scale'
+title: 'Reiz: Structural Source Code Search'
 tags:
     - Python
     - source code search

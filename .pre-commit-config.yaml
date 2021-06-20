@@ -22,12 +22,10 @@ repos:
     hooks:
     -   id: setup-cfg-fmt
 -   repo: https://github.com/executablebooks/mdformat/
-    rev: 0.6.1
+    rev: 0.7.5
     hooks:
     -   id: mdformat
         exclude: ^paper/
         additional_dependencies:
         - mdformat-black
-        args:
-        -   --wrap
-        -   "80"
+        - mdformat_tables

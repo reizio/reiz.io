@@ -11,8 +11,10 @@ knowledge (no semantics applied).
 
 reizql
 internals
+performance
 contributing
 installation-to-aws
+related-projects
 ```
 
 ## Installation via Docker
@@ -145,3 +147,38 @@ FunctionDef(
     type_comment=None,
 )
 ```
+
+## QA
+
+> What sort of source warehouses Reiz can index? Can I use my project on GitHub?
+
+Short answer, currently it comes embedded with an indexer for the most common
+python packages. And no, there is no formal support for individual package
+deployment.
+
+The source code sampling process for Reiz happens in 3 stages, which the initial
+one is actually about indexing the target locations. Currently the embedded
+tooling within reiz.io can index PyPI, through `reiz.sampling.get_packages`
+module. The module's output is a JSON file that describes certain metadata
+regarding the indexed repositories;
+
+```json
+app@frankfurt:~/reiz.io$ cat data/dataset.json | head
+[
+    {
+        "name": "six",
+        "downloads": 885510678,
+        "git_source": "https://github.com/benjaminp/six",
+        "git_revision": "3974f0c4f6700a5821b451abddff8b3ba6b2a04f",
+        "license_type": "MIT"
+    },
+    ...
+]
+```
+
+This list can be modified through hand, or you could simply write a script that
+can generate the same sample for packages/repositories from other platforms. It
+is also possible for you to just create a dataset of a single repository, that
+being the project that you want to index. Though stating again, reiz.io as a
+search engine for Python does not support you to add custom repositories in a
+formal way.
