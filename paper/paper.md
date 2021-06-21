@@ -70,13 +70,14 @@ most notably by CPython itself.
 
 ## Sampling Source Code
 
-The source code sampling starts with the collection of the most used python
-packages, according to the download statistics over the PyPI
-\[@hugovankemenade_richardsi_2021\]. The list then gets cross-linked to the
-project's corresponding source control platforms (so that, we can reference the
-revision that we are fetching). Later on, the data gets downloaded via `git`
-and then gets sanitized until there is nothing left besides valid source files
-for the host language.
+Reiz is able to sample source code from a list of projects on a git remote (e.g
+GitHub). The reference implementation for Reiz comes with an indexer which can
+automatically construct a list for the most popular packages on PyPI,
+according to the download statistics \[@hugovankemenade_richardsi_2021\]. The
+list then gets cross-linked to the project's corresponding source control
+platforms (so that, we can reference the revision that we are fetching). Later
+on, the data gets downloaded via `git` and then gets sanitized until there is
+nothing left besides valid source files for the host language.
 
 Subsequently, files get parsed to the AST form offered by the host language,
 and then annotated with some static knowledge, so that the computation of these
