@@ -51,7 +51,11 @@ textual form. In the past, there has been some work done regarding making
 queries more expressive through regular expressions (one example might
 codesearch.debian.net \[@debiancodesearch\]), and even annotating the result
 set with some semantical and structural knowledge (via finding and resolving
-API names \[@BAJRACHARYA2014241\]).
+API names \[@BAJRACHARYA2014241\]). There also have been various tools
+\[@fast\], \[@astsearch\] to search AST patterns within source code, but with a
+limited query format and in a file-by-file basis (no index database) which is
+making them quite hard to work with in order to examine a large dataset of
+source code.
 
 # Method
 
