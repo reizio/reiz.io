@@ -44,7 +44,7 @@ Objective: search for a return statement that returns a tuple `return ..., ...`
 
 ## Conclusion
 
-On all three objectives, Reiz got all the matches as true-positive due to it's nature of
-being able to leverage syntax trees as well as other annotations that it could collect at
-pre-processing stage (such as node boundaries to report the exact location) unlike others
-where the source code is exercised like a regular textual document.
+On all three objectives, Reiz got all the matches as true-positive due to due to it's ability to
+leverage syntax tree structure as well as other annotations that it could collect at pre-processing
+stage (such as node boundaries to report the exact location) unlike others where the source code is
+exercised like a regular textual document.

@@ -17,7 +17,7 @@ When the documentation of a framework doesn't sustain the curiosity, searching
 for a structure (e.g a function, a constant) to see how it can be utilized in
 real-world software is a common need among developers \[@developersearch2017\].
 
-For the problems mentioned above, we present Reiz. A source code search engine
+For the problems mentioned above, we present Reiz: a source code search engine
 backend that can exercise queries to match syntax trees in order to leverage
 the existing language syntax to describe partial knowledge (e.g a searching for
 a `try`/ `finally` construct without knowing what is under the `try` block).
@@ -25,20 +25,19 @@ a `try`/ `finally` construct without knowing what is under the `try` block).
 # State of the field
 
 Popular source code search engines (e.g Github Code Search
-\[@githubcodesearch\]) uses full-text search where the code is behaved not much
-different than a regular textual document. Even though this approach works for
-some basic queries, structurally it can't go further than matching token
+\[@githubcodesearch\]) use full-text search where the code is treated no
+differently than a regular textual document. Even though this approach works
+for some basic queries, structurally it can't go further than matching token
 sequences. This often causes seeing irrelevant search results on complex
 queries, or even not being able to express the search itself in a purely
 textual form. In the past, there has been some work done regarding making
 queries more expressive through regular expressions (one example might
 codesearch.debian.net \[@debiancodesearch\]), and even annotating the result
-set with some semantical and structural knowledge (via finding and resolving
-API names \[@BAJRACHARYA2014241\]). There also have been various tools
-\[@fast\], \[@astsearch\] to search AST patterns within source code, but with a
-limited query format and in a file-by-file basis (no index database) which is
-making them quite hard to work with in order to examine a large dataset of
-source code.
+set with some semantic and structural knowledge (via finding and resolving API
+names \[@BAJRACHARYA2014241\]). There also have been various tools \[@fast\],
+\[@astsearch\] to search AST patterns within source code, but with a limited
+query format and in a file-by-file basis (no index database) which makes them
+quite hard to work with in order to examine a large dataset of source code.
 
 # Method
 
@@ -52,8 +51,8 @@ Abstract Syntax Trees) are being held. It is based on an EdgeDB \[@edgedb\]
 instance which interprets the compiled queries and returns the raw result set.
 The schema used in the Index DB is in the format of ESDL (EdgeDB Schema
 Definition Language) and automatically generated from the host language's ASDL
-\[@asdl97\] declaration. It is a common format used by many different projects,
-most notably by CPython itself.
+\[@asdl97\] declaration. ASDL is a common format used by many different
+projects, most notably by CPython itself.
 
 ## Sampling Source Code
 
@@ -68,12 +67,12 @@ nothing left besides valid source files for the host language.
 
 Subsequently, files get parsed to the AST form offered by the host language,
 and then annotated with some static knowledge, so that the computation of these
-properties won't cost anything on the runtime. The annotations include node
-tags (a unique identifier for a piece of AST that will be the same every time
-the same structure is annotated, like tree hash), ancestral information (like a
-set of 2-element tuples, where the first one points to the parent type and the
-the second one points to the field that the child belongs to) and metadata
-regarding the project (like the filename, project name, GitHub url). Afterward
+properties won't cost anything at runtime. The annotations include node tags
+(a unique identifier for a piece of AST that will be the same every time the
+same structure is annotated, like tree hash), ancestral information (like a set
+of 2-element tuples, where the first one points to the parent type and the the
+second one points to the field that the child belongs to) and metadata
+regarding the project (like the filename, project name, GitHub URL). Afterward
 the annotated AST gets serialized into the Index DB.
 
 ## Query Compiler
@@ -136,9 +135,9 @@ For(
 ```
 
 The query in the example can be automatically generated through various forms,
-as well as as can be hand written. For example, IRun project targets ReizQL
+as well as being hand written. For example, the IRun project targets ReizQL
 with a python superset form to be a more human friendly interface to the
-engine;
+engine:
 
 ```
 for $target in ...:

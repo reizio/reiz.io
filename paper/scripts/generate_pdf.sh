@@ -8,7 +8,7 @@ mv source/paper_bibertool.bib source/paper.bib
 rm source/paper.bib.blg
 
 # prepare for build
-cat source/header.md source/content.md source/evaluation.md > paper.md
+cat source/header.md source/content.md source/evaluation.md source/footer.md > paper.md
 cp source/paper.bib .
 cp source/assets/* .
 
