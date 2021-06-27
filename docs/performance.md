@@ -3,7 +3,7 @@
 | query                                            | timing (s) |
 | ------------------------------------------------ | ---------- |
 | `Call(Name("len"))`                              | 0.025985   |
-| \`BinOp(op=Add()                                 | Sub())\`   |
+| `BinOp(op=Add() \| Sub())`                       | 0.030508   |
 | `Try(handlers=LEN(min=3, max=5))`                | 0.033486   |
 | `BinOp(left=Constant(), right=Constant())`       | 0.146516   |
 | `FunctionDef(f"run_%", returns = not None)`      | 0.0216     |
@@ -45,8 +45,10 @@ Machine;
 | disk         | regular SSD (not NVME) |
 
 IndexDB;
-|-----------------	|------------	|
-| total files     	| 53k        	|
-| total AST nodes 	| 17 521 894 	|
+
+|                 |            |
+| --------------- | ---------- |
+| total files     | 53k        |
+| total AST nodes | 17 521 894 |
 
 Benchmark script is present at the source checkout (`scripts/benchmark_doc.py`).
