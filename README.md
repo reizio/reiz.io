@@ -1,5 +1,7 @@
 <p align="center"><img src="https://github.com/reizio/reiz.io/blob/master/docs/logo.png"></p>
 
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.03296/status.svg)](https://doi.org/10.21105/joss.03296)
+
 # reiz.io
 
 reiz.io is a structural source code search engine for Python. Compared to the
