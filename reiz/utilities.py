@@ -10,7 +10,7 @@ from urllib.request import urlopen
 try:
     import black
 except ModuleNotFoundError:
-    import pprint
+    import pprint as _pprint
 
     USE_PPRINT = True
 else:
@@ -89,7 +89,7 @@ def normalize(data):
 # from reiz.utilities import pprint;pprint()
 def pprint(obj):
     if USE_PPRINT:
-        pprint.pprint(obj)
+        _pprint.pprint(obj)
     else:
         print(black.format_str(repr(obj), mode=BLACK_MODE))
 
