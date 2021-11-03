@@ -7,7 +7,7 @@ from reiz.sampling import SamplingData, dump_dataset
 from reiz.utilities import guarded, json_request, logger
 
 PYPI_INSTANCE = "https://pypi.org/pypi"
-PYPI_DATSET_URL = "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-365-days.json"
+PYPI_DATSET_URL = "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-30-days.min.json"
 
 SOURCE_LOCATIONS = frozenset(
     (
