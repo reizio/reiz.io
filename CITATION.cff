@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+authors:
+- family-names: "Taskaya"
+  given-names: "Batuhan"
+  orcid: "https://orcid.org/0000-0002-5081-5529"
+title: "Reiz: Structural Source Code Search"
+version: 1.0.0
+doi: 10.21105/joss.03296
+date-released: 21-07-24
+url: "https://github.com/reizio/reiz.io"
