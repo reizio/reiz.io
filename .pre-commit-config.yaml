@@ -1,7 +1,7 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
--   repo: https://github.com/hakancelik96/unimport
+-   repo: https://github.com/hakancelikdev/unimport
     rev: 0.8.3
     hooks:
       - id: unimport
