@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/hakancelik96/unimport
-    rev: 0dc8d609eb670eeb3335958acddcb6059cc4b8dd
+    rev: 004b5dd0c8112330275beb52c4ccfce016a4b945
     hooks:
       - id: unimport
         args:
