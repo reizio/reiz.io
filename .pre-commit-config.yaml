@@ -9,11 +9,11 @@ repos:
         -   --remove
         -   --ignore-init
 -   repo: https://github.com/psf/black
-    rev: 22.10.0
+    rev: 22.12.0
     hooks:
     -   id: black
 -   repo: https://github.com/PyCQA/isort
-    rev: 5.10.1
+    rev: 5.11.4
     hooks:
     -   id: isort
         additional_dependencies: [toml]
