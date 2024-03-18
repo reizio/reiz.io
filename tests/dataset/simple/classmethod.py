@@ -1,6 +1,5 @@
 @classmethod  # reiz: tp
-def foo():
-    ...
+def foo(): ...
 
 
 @classmethod  # reiz: tp
@@ -11,8 +10,7 @@ def foo():
 
 
 @staticmethod
-def foo():
-    ...
+def foo(): ...
 
 
 @staticmethod

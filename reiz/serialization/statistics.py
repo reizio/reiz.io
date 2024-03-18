@@ -11,5 +11,4 @@ class Insertion(ReizEnum):
     INSERTED = auto()
 
 
-class Statistics(Counter):
-    ...
+class Statistics(Counter): ...

@@ -52,12 +52,10 @@ class EQLPrinter(IRPrinter):
                         self.view(delimiter)
 
 
-class EQL(base.IRObject):
-    ...
+class EQL(base.IRObject): ...
 
 
-class Unit(EQL, base.Unit):
-    ...
+class Unit(EQL, base.Unit): ...
 
 
 class Statement(EQL, base.Statement):
