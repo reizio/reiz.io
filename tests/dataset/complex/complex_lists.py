@@ -1,8 +1,7 @@
 @foo  # reiz: tp
 def something():
     @bar(baz(quux), foo)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -12,8 +11,7 @@ def something():
 @foo
 def something():
     @bar(baz(quux), foo)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -25,8 +23,7 @@ def something():
 @foo.bar
 def something():
     @bar(baz(quux), foo)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -36,8 +33,7 @@ def something():
 @foo
 def something():
     @bar(baz(quux, quux), foo)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -47,8 +43,7 @@ def something():
 @foo
 def something():
     @bar(baz(quux), foo, bar)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -58,8 +53,7 @@ def something():
 @foo
 def something():
     @bar(baz(), foo)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -69,8 +63,7 @@ def something():
 @foo
 def something():
     @bar(foo, foo)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -80,8 +73,7 @@ def something():
 @foo
 def something():
     @bar
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -91,8 +83,7 @@ def something():
 @foo
 def something():
     @bar(baz(quux), foo)
-    class something:
-        ...
+    class something: ...
 
     if foo:
         for bar in baz:
@@ -102,8 +93,7 @@ def something():
 @foo
 def something():
     @bar(baz(quux), foo)
-    def something():
-        ...
+    def something(): ...
 
     while True:
         for bar in baz:
@@ -113,8 +103,7 @@ def something():
 @foo
 def something():
     @bar(baz(quux), foo)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
@@ -124,8 +113,7 @@ def something():
 @foo
 def something():
     @bar(baz(quux), foo)
-    def something():
-        ...
+    def something(): ...
 
     if foo:
         for bar in baz:
