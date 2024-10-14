@@ -7,12 +7,10 @@ from reiz.schema import BaseSchema
 _IR_BUILDERS = {}
 
 
-class IRError(Exception):
-    ...
+class IRError(Exception): ...
 
 
-class UnsupportedOperation(IRError):
-    ...
+class UnsupportedOperation(IRError): ...
 
 
 class IRBuilder:
