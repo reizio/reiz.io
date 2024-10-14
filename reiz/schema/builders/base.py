@@ -1,5 +1,4 @@
-class SchemaError(Exception):
-    ...
+class SchemaError(Exception): ...
 
 
 class BaseSchemaGenerator:

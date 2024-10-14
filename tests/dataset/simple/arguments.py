@@ -25,17 +25,14 @@ def quux(something_else, /, bar):
     pass
 
 
-def empty():
-    ...
+def empty(): ...
 
 
-def maybe(*bar, **baz):
-    ...
+def maybe(*bar, **baz): ...
 
 
 def only(bar, /):
     print(3)
 
 
-def only(*, baz):
-    ...
+def only(*, baz): ...

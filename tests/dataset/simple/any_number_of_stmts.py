@@ -21,8 +21,7 @@ def baz():  # reiz: tp
     pass
 
 
-class T:
-    ...
+class T: ...
 
 
 a = 1

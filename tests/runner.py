@@ -135,8 +135,7 @@ def setup(
         update_db(change_db_schema)
 
 
-class ExpectationFailed(Exception):
-    ...
+class ExpectationFailed(Exception): ...
 
 
 @dataclass
