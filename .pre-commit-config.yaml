@@ -2,27 +2,27 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/hakancelik96/unimport
-    rev: 33ead41ee30f1d323a9c2fcfd0114297efbbc4d5
+    rev: 1.4.0
     hooks:
       - id: unimport
         args:
         -   --remove
         -   --ignore-init
--   repo: https://github.com/psf/black
-    rev: 22.12.0
+-   repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 26.5.1
     hooks:
     -   id: black
 -   repo: https://github.com/PyCQA/isort
-    rev: 5.11.4
+    rev: 9.0.1
     hooks:
     -   id: isort
         additional_dependencies: [toml]
 -   repo: https://github.com/asottile/setup-cfg-fmt
-    rev: v2.2.0
+    rev: v3.2.0
     hooks:
     -   id: setup-cfg-fmt
 -   repo: https://github.com/executablebooks/mdformat/
-    rev: 0.7.16
+    rev: 1.0.0
     hooks:
     -   id: mdformat
         exclude: ^paper/
